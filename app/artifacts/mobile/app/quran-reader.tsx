@@ -142,7 +142,7 @@ export default function QuranReader() {
           <Text style={[styles.statusText, { color: colors.mutedForeground }]}>تعذر تحميل التفسير الآن.</Text>
         ) : (
           <Text style={[styles.tafsirText, { color: colors.foreground }]}>
-            {tafsirQuery.data?.text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ||
+            {tafsirQuery.data?.text?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ||
               'لا يوجد تفسير متاح لهذه الآية.'}
           </Text>
         )}

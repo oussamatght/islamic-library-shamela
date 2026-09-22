@@ -18,7 +18,7 @@ export default function MoreScreen() {
   const colors = useColors();
   const router = useRouter();
   const hadithQuery = useGetHadiths({ categoryId: 2, page: 1, perPage: 1 });
-  const hadith = hadithQuery.data?.data[0];
+  const hadith = hadithQuery.data?.data?.[0];
   return (
     <Screen>
       <AppHeader eyebrow="مساحتك الخاصة" title="المزيد" />

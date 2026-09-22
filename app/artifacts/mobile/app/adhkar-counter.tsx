@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
@@ -14,7 +14,11 @@ export default function AdhkarCounter() {
   const { title, categoryId } = useLocalSearchParams<{ title?: string; categoryId?: string }>();
   const query = useGetAdhkar({ categoryId: Number(categoryId) || 1 });
   const [count, setCount] = useState(0);
-  const item = query.data?.categories[0]?.items[0];
+  const [itemIndex, setItemIndex] = useState(0);
+  const categories = query.data?.categories ?? [];
+  const category = categories.find((candidate) => candidate.title === title) ?? categories[0];
+  const items = category?.items ?? [];
+  const item = items[itemIndex] ?? items[0];
   const target = Math.max(item?.repeat ?? 1, 1);
 
   if (query.isPending) {
@@ -32,8 +36,19 @@ export default function AdhkarCounter() {
   const handleCount = () => {
     if (count < target) {
       setCount((value) => value + 1);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web') {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
     }
+  };
+
+  const navigateTo = (direction: 'prev' | 'next') => {
+    if (items.length === 0) return;
+    setItemIndex((index) => {
+      if (direction === 'next') return (index + 1) % items.length;
+      return (index - 1 + items.length) % items.length;
+    });
+    setCount(0);
   };
 
   return (
@@ -75,6 +90,7 @@ export default function AdhkarCounter() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="الذكر السابق"
+          onPress={() => navigateTo('prev')}
           style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, opacity: pressed ? 0.65 : 1 }]}
         >
           <Feather name="chevron-right" size={17} color={colors.primary} />
@@ -83,6 +99,7 @@ export default function AdhkarCounter() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="الذكر التالي"
+          onPress={() => navigateTo('next')}
           style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, opacity: pressed ? 0.65 : 1 }]}
         >
           <Text style={[styles.actionText, { color: colors.foreground }]}>التالي</Text>

@@ -80,7 +80,7 @@ export default function PrayerScreen() {
         .map(([name, key]) => ({ name, time: prayerQuery.data.timings[key] }))
         .find(({ time }) => minutesFromTime(time) > currentMinutes) ??
       prayerRows
-        .map(([name, key]) => ({ name, time: prayerQuery.data?.timings[key] }))
+        .map(([name, key]) => ({ name, time: prayerQuery.data?.timings?.[key] }))
         .find(({ time }) => Boolean(time)) ??
       null
     );

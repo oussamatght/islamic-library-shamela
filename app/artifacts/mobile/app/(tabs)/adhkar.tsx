@@ -22,7 +22,7 @@ export default function AdhkarScreen() {
   const duasQuery = useGetDuas({ categoryId: 6 });
   const categories = adhkarQuery.data?.categories ?? [];
   const recommended = categories[0]?.items[0];
-  const dua = duasQuery.data?.categories[0]?.items[0];
+  const dua = duasQuery.data?.categories?.[0]?.items[0];
 
   if (adhkarQuery.isPending || duasQuery.isPending) {
     return (
