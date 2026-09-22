@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorBoundary as AppErrorBoundary } from '@/components/ErrorBoundary';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -17,8 +17,14 @@ import * as SplashScreen from 'expo-splash-screen';
 import { setBaseUrl } from '@workspace/api-client-react';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-setBaseUrl(process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : null);
+void SplashScreen.preventAutoHideAsync();
+const configuredDomain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
+const apiBaseUrl = configuredDomain
+  ? /^https?:\/\//i.test(configuredDomain)
+    ? configuredDomain
+    : `https://${configuredDomain}`
+  : null;
+setBaseUrl(apiBaseUrl);
 I18nManager.allowRTL(true);
 if (Platform.OS !== 'web') {
   I18nManager.forceRTL(true);
@@ -58,7 +64,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ErrorBoundary>
+      <AppErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
@@ -66,7 +72,9 @@ export default function RootLayout() {
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
-      </ErrorBoundary>
+      </AppErrorBoundary>
     </SafeAreaProvider>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/RouteErrorBoundary';

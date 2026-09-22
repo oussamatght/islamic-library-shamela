@@ -130,8 +130,21 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
+  let nativeTabsAvailable = false;
+  if (Platform.OS === 'ios') {
+    try {
+      nativeTabsAvailable = isLiquidGlassAvailable();
+    } catch (error) {
+      if (__DEV__) {
+        console.error('Native liquid glass tabs are unavailable:', error);
+      }
+    }
+  }
+
+  if (nativeTabsAvailable) {
     return <NativeTabLayout />;
   }
   return <ClassicTabLayout />;
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/RouteErrorBoundary';

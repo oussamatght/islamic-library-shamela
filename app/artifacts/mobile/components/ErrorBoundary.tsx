@@ -29,6 +29,10 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
+    if (__DEV__) {
+      console.error('Unhandled render error:', error);
+      console.error('Component stack:', info.componentStack);
+    }
     if (typeof this.props.onError === 'function') {
       this.props.onError(error, info.componentStack);
     }
