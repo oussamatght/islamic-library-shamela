@@ -62,27 +62,31 @@ export default function PrayerScreen() {
     };
   }, []);
 
-  const prayerParams = {
-    latitude: coordinates?.latitude ?? 0,
-    longitude: coordinates?.longitude ?? 0,
-    date: todayForApi(),
-  };
+  const prayerParams = useMemo(
+    () => ({
+      latitude: coordinates?.latitude ?? 0,
+      longitude: coordinates?.longitude ?? 0,
+      date: todayForApi(),
+    }),
+    [coordinates],
+  );
   const prayerQuery = useGetPrayerTimes(prayerParams, {
     query: { enabled: Boolean(coordinates), queryKey: getGetPrayerTimesQueryKey(prayerParams) },
   });
 
   const nextPrayer = useMemo(() => {
     if (!prayerQuery.data) return null;
+    const timings = prayerQuery.data.timings ?? {};
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const upcoming = prayerRows
+      .map(([name, key]) => ({ name, time: timings[key] }))
+      .find(({ time }) => minutesFromTime(time) > currentMinutes);
+    if (upcoming) return upcoming;
     return (
       prayerRows
-        .map(([name, key]) => ({ name, time: prayerQuery.data.timings[key] }))
-        .find(({ time }) => minutesFromTime(time) > currentMinutes) ??
-      prayerRows
-        .map(([name, key]) => ({ name, time: prayerQuery.data?.timings?.[key] }))
-        .find(({ time }) => Boolean(time)) ??
-      null
+        .map(([name, key]) => ({ name, time: timings[key] }))
+        .find(({ time }) => Boolean(time)) ?? null
     );
   }, [prayerQuery.data]);
 

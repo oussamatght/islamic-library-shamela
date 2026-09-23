@@ -14,17 +14,33 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import Constants from 'expo-constants';
 import { setBaseUrl } from '@workspace/api-client-react';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 void SplashScreen.preventAutoHideAsync();
-const configuredDomain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
-const apiBaseUrl = configuredDomain
-  ? /^https?:\/\//i.test(configuredDomain)
-    ? configuredDomain
-    : `https://${configuredDomain}`
-  : null;
-setBaseUrl(apiBaseUrl);
+
+function resolveApiBaseUrl(): string | null {
+  const configuredDomain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
+  if (configuredDomain) {
+    return /^https?:\/\//i.test(configuredDomain)
+      ? configuredDomain
+      : `https://${configuredDomain}`;
+  }
+  const host = Constants.expoConfig?.hostUri?.replace(/:\d+$/, '');
+  if (__DEV__ && host) {
+    const apiPort = process.env.EXPO_PUBLIC_API_PORT?.trim() || '3000';
+    return `http://${host}:${apiPort}`;
+  }
+  if (__DEV__) {
+    console.warn(
+      '[api-client] EXPO_PUBLIC_DOMAIN is not set and the Expo dev host could not be resolved. Set EXPO_PUBLIC_API_PORT or EXPO_PUBLIC_DOMAIN.',
+    );
+  }
+  return null;
+}
+
+setBaseUrl(resolveApiBaseUrl());
 I18nManager.allowRTL(true);
 if (Platform.OS !== 'web') {
   I18nManager.forceRTL(true);
