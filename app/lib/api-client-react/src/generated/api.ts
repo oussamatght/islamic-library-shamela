@@ -16,18 +16,18 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  AudioTrack,
-  DhikrCollection,
   GetAdhkarParams,
   GetDuasParams,
   GetHadithsParams,
   GetPrayerTimesParams,
-  HadithList,
   HealthStatus,
-  PrayerTimes,
-  QuranReader,
-  QuranSurahList,
-  Tafsir,
+  ResponseEnvelopeAudioTrack,
+  ResponseEnvelopeDhikrCollection,
+  ResponseEnvelopeHadithList,
+  ResponseEnvelopePrayerTimes,
+  ResponseEnvelopeQuranReader,
+  ResponseEnvelopeQuranSurahList,
+  ResponseEnvelopeTafsir,
   UpstreamErrorResponse
 } from './api.schemas';
 
@@ -147,9 +147,9 @@ export const getGetQuranSurahsUrl = () => {
 /**
  * @summary List Quran surahs
  */
-export const getQuranSurahs = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuranSurahList> => {
+export const getQuranSurahs = async ( options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopeQuranSurahList> => {
 
-  return customFetch<QuranSurahList>(getGetQuranSurahsUrl(),
+  return customFetch<ResponseEnvelopeQuranSurahList>(getGetQuranSurahsUrl(),
   {
     ...options,
     method: 'GET'
@@ -224,9 +224,9 @@ export const getGetQuranReaderUrl = (surahId: number,) => {
 /**
  * @summary Read a Quran surah
  */
-export const getQuranReader = async (surahId: number, options?: Parameters<typeof customFetch>[1]): Promise<QuranReader> => {
+export const getQuranReader = async (surahId: number, options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopeQuranReader> => {
 
-  return customFetch<QuranReader>(getGetQuranReaderUrl(surahId),
+  return customFetch<ResponseEnvelopeQuranReader>(getGetQuranReaderUrl(surahId),
   {
     ...options,
     method: 'GET'
@@ -301,9 +301,9 @@ export const getGetQuranAudioUrl = (surahId: number,) => {
 /**
  * @summary Get a surah recitation
  */
-export const getQuranAudio = async (surahId: number, options?: Parameters<typeof customFetch>[1]): Promise<AudioTrack> => {
+export const getQuranAudio = async (surahId: number, options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopeAudioTrack> => {
 
-  return customFetch<AudioTrack>(getGetQuranAudioUrl(surahId),
+  return customFetch<ResponseEnvelopeAudioTrack>(getGetQuranAudioUrl(surahId),
   {
     ...options,
     method: 'GET'
@@ -380,9 +380,9 @@ export const getGetQuranTafsirUrl = (surahId: number,
  * @summary Get tafsir for an ayah
  */
 export const getQuranTafsir = async (surahId: number,
-    ayahNumber: number, options?: Parameters<typeof customFetch>[1]): Promise<Tafsir> => {
+    ayahNumber: number, options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopeTafsir> => {
 
-  return customFetch<Tafsir>(getGetQuranTafsirUrl(surahId,ayahNumber),
+  return customFetch<ResponseEnvelopeTafsir>(getGetQuranTafsirUrl(surahId,ayahNumber),
   {
     ...options,
     method: 'GET'
@@ -467,9 +467,9 @@ export const getGetPrayerTimesUrl = (params: GetPrayerTimesParams,) => {
 /**
  * @summary Get prayer times for a location and date
  */
-export const getPrayerTimes = async (params: GetPrayerTimesParams, options?: Parameters<typeof customFetch>[1]): Promise<PrayerTimes> => {
+export const getPrayerTimes = async (params: GetPrayerTimesParams, options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopePrayerTimes> => {
 
-  return customFetch<PrayerTimes>(getGetPrayerTimesUrl(params),
+  return customFetch<ResponseEnvelopePrayerTimes>(getGetPrayerTimesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -551,9 +551,9 @@ export const getGetHadithsUrl = (params?: GetHadithsParams,) => {
 /**
  * @summary List Arabic hadith
  */
-export const getHadiths = async (params?: GetHadithsParams, options?: Parameters<typeof customFetch>[1]): Promise<HadithList> => {
+export const getHadiths = async (params?: GetHadithsParams, options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopeHadithList> => {
 
-  return customFetch<HadithList>(getGetHadithsUrl(params),
+  return customFetch<ResponseEnvelopeHadithList>(getGetHadithsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -635,9 +635,9 @@ export const getGetAdhkarUrl = (params?: GetAdhkarParams,) => {
 /**
  * @summary List Arabic adhkar
  */
-export const getAdhkar = async (params?: GetAdhkarParams, options?: Parameters<typeof customFetch>[1]): Promise<DhikrCollection> => {
+export const getAdhkar = async (params?: GetAdhkarParams, options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopeDhikrCollection> => {
 
-  return customFetch<DhikrCollection>(getGetAdhkarUrl(params),
+  return customFetch<ResponseEnvelopeDhikrCollection>(getGetAdhkarUrl(params),
   {
     ...options,
     method: 'GET'
@@ -719,9 +719,9 @@ export const getGetDuasUrl = (params?: GetDuasParams,) => {
 /**
  * @summary List Arabic duas
  */
-export const getDuas = async (params?: GetDuasParams, options?: Parameters<typeof customFetch>[1]): Promise<DhikrCollection> => {
+export const getDuas = async (params?: GetDuasParams, options?: Parameters<typeof customFetch>[1]): Promise<ResponseEnvelopeDhikrCollection> => {
 
-  return customFetch<DhikrCollection>(getGetDuasUrl(params),
+  return customFetch<ResponseEnvelopeDhikrCollection>(getGetDuasUrl(params),
   {
     ...options,
     method: 'GET'

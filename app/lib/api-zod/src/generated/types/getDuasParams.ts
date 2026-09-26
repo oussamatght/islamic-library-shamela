@@ -7,8 +7,5 @@
  */
 
 export type GetDuasParams = {
-/**
- * @minimum 1
- */
-categoryId?: number;
+categoryId?: string;
 };

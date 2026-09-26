@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { useGetAdhkar } from '@workspace/api-client-react';
+import { useGetAdhkar } from '@/lib/api';
 import { ErrorState, IconButton, isOfflineError, LoadingState, Screen } from '@/components/ui';
 import { radii, spacing, typography } from '@/constants/tokens';
 import { useColors } from '@/hooks/useColors';
@@ -12,14 +12,14 @@ export default function AdhkarCounter() {
   const colors = useColors();
   const router = useRouter();
   const { title, categoryId } = useLocalSearchParams<{ title?: string; categoryId?: string }>();
-  const query = useGetAdhkar({ categoryId: Number(categoryId) || 1 });
+  const query = useGetAdhkar({ categoryId });
   const [count, setCount] = useState(0);
   const [itemIndex, setItemIndex] = useState(0);
-  const categories = query.data?.categories ?? [];
+  const categories = query.data ?? [];
   const category = categories.find((candidate) => candidate.title === title) ?? categories[0];
   const items = category?.items ?? [];
   const item = items[itemIndex] ?? items[0];
-  const target = Math.max(item?.repeat ?? 1, 1);
+  const target = Math.max(item?.repeatCount ?? 1, 1);
 
   if (query.isPending) {
     return <Screen><LoadingState /></Screen>;
@@ -62,7 +62,7 @@ export default function AdhkarCounter() {
         <IconButton icon="rotate-ccw" label="إعادة العداد" onPress={() => setCount(0)} variant="soft" />
       </View>
       <View style={styles.focus}>
-        <Text style={[styles.dhikr, { color: colors.foreground }]}>{item.text}</Text>
+        <Text style={[styles.dhikr, { color: colors.foreground }]}>{item.arabicText}</Text>
         {item.translation ? (
           <Text style={[styles.translation, { color: colors.mutedForeground }]}>{item.translation}</Text>
         ) : null}

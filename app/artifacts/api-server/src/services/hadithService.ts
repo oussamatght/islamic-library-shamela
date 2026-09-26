@@ -10,15 +10,27 @@ export type HadithCategoryNode = {
   children: HadithCategoryNode[];
 };
 
+/**
+ * List items share the exact shape of detail items (`HadithDetail` minus the
+ * optional explanation/categories) so the client renders the same card for a
+ * list row and a detail view. `text` falls back to the upstream explanation
+ * field when the list endpoint omits the body text.
+ */
 export type HadithListItem = {
   id: string;
   title: string;
+  text: string;
+  source: string;
+  attribution?: string;
+  grade?: string;
+  reference?: string;
 };
 
 export type HadithDetail = {
   id: string;
   title: string;
   hadith: string;
+  source: string;
   attribution?: string;
   grade?: string;
   explanation?: string;
@@ -119,10 +131,20 @@ type HadithListEnvelope = {
   meta?: unknown;
 };
 
+const HADITH_SOURCE = "hadeethenc.com";
+
 function normalizeListItem(raw: JsonRecord): HadithListItem {
+  const text =
+    stringProp(raw.hadeeth) ?? stringProp(raw.explanation) ?? stringProp(raw.title) ?? "";
+  const reference = normalizeReference(raw as HadithOneRaw);
   return {
     id: String(raw.id ?? ""),
     title: String(raw.title ?? ""),
+    text,
+    source: HADITH_SOURCE,
+    ...(stringProp(raw.attribution) ? { attribution: stringProp(raw.attribution)! } : {}),
+    ...(stringProp(raw.grade) ? { grade: stringProp(raw.grade)! } : {}),
+    ...(reference ? { reference } : {}),
   };
 }
 
@@ -229,6 +251,7 @@ export async function getHadith(hadithId: string): Promise<HadithDetail> {
     id: String(payload.id ?? ""),
     title,
     hadith: String(payload.hadeeth ?? ""),
+    source: SOURCE_NAME,
     ...(stringProp(payload.attribution) ? { attribution: stringProp(payload.attribution)! } : {}),
     ...(stringProp(payload.grade) ? { grade: stringProp(payload.grade)! } : {}),
     ...(stringProp(payload.explanation) ? { explanation: stringProp(payload.explanation)! } : {}),

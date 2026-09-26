@@ -7,6 +7,7 @@
  */
 import type { DhikrCategory } from './dhikrCategory';
 
-export interface DhikrCollection {
-  categories: DhikrCategory[];
+export interface ResponseEnvelopeDhikrCollection {
+  success: true;
+  data: DhikrCategory[];
 }

@@ -8,8 +8,5 @@
 import type { HusnCategoryIdParameter } from './husnCategoryIdParameter';
 
 export type GetAdhkarParams = {
-/**
- * @minimum 1
- */
 categoryId?: HusnCategoryIdParameter;
 };

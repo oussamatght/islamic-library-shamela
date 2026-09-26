@@ -2,13 +2,14 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useGetHadiths } from '@workspace/api-client-react';
+import { useGetHadiths } from '@/lib/api';
 import { AppHeader, ErrorState, isOfflineError, LoadingState, Screen, SectionTitle } from '@/components/ui';
 import { radii, spacing, typography } from '@/constants/tokens';
 import { useColors } from '@/hooks/useColors';
 
 const links = [
   { title: 'مواقيت الصلاة', subtitle: 'تابع صلوات اليوم', icon: 'clock' as const, route: '/prayer' },
+  { title: 'كتب الحديث', subtitle: 'البخاري ومسلم وغيرهما', icon: 'book-open' as const, route: '/hadith-browser' },
   { title: 'اتجاه القبلة', subtitle: 'اعرف اتجاه مكة', icon: 'compass' as const, route: '/qibla' },
   { title: 'المفضلة', subtitle: 'آيات وأحاديث محفوظة', icon: 'heart' as const, route: '/favorites' },
   { title: 'الإعدادات', subtitle: 'المظهر والقراءة والصوت', icon: 'sliders' as const, route: '/settings' },
@@ -17,8 +18,8 @@ const links = [
 export default function MoreScreen() {
   const colors = useColors();
   const router = useRouter();
-  const hadithQuery = useGetHadiths({ categoryId: 2, page: 1, perPage: 1 });
-  const hadith = hadithQuery.data?.data?.[0];
+  const hadithQuery = useGetHadiths({ categoryId: '2', page: 1, perPage: 1 });
+  const hadith = hadithQuery.data?.items?.[0];
   return (
     <Screen>
       <AppHeader eyebrow="مساحتك الخاصة" title="المزيد" />

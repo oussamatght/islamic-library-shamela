@@ -1,0 +1,242 @@
+/**
+ * Quran data — direct, auth-free providers (serverless architecture):
+ *   - text + chapters + tafsir : api.alquran.cloud/v1
+ *   - chapter audio            : api.quran.com/api/v4/chapter_recitations/7
+ *
+ * (Quran Foundation/QFC was dropped client-side on purpose: it needs an
+ * OAuth2 client secret that cannot live safely inside a shipped app bundle.)
+ *
+ * Normalization logic mirrors what artifacts/api-server/src/services/
+ * quranService.ts did, so screen-level shapes are unchanged.
+ */
+
+import { fetchJson, isJsonRecord, type JsonRecord } from "./http";
+import type {
+  QuranAudio,
+  QuranChapter,
+  QuranChapterPage,
+  QuranSurah,
+  QuranTafsir,
+  QuranVerse,
+} from "./types";
+
+const ALQURAN_API = "https://api.alquran.cloud/v1";
+const QURAN_COM_API = "https://api.quran.com/api/v4";
+
+/** Reciter 7 on api.quran.com = Mishary Rashid Alafasy (murattal). */
+const RECITER_ID = 7;
+const RECITER_NAME = "مشاري العفاسي";
+
+/**
+ * Matches the bismillah in ANY Uthmani-style rendering (tashkeel, dagger
+ * alif, alef-wasla differ across providers). Strategy: strip combining marks,
+ * match the four words by their base letters, then remove the equivalent
+ * leading portion from the ORIGINAL text so the rest keeps its tashkeel.
+ *
+ * Observed base-letter forms (alquran.cloud quran-uthmani):
+ *   بسم (628,633,645)  ٱلله (671,644,644,647)
+ *   ٱلرحمن (671,644,631,62d,645,646)  ٱلرحيم (671,644,631,62d,64a,645)
+ */
+const BISMILLAH_BASE = /^بسم\s+ٱلله\s+ٱلرحمن\s+ٱلرحيم(?=\s|$)/;
+
+const TASHKEEL =
+  /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g;
+
+function stripLeadingBismillah(text: string): string {
+  const stripped = text.replace(TASHKEEL, "");
+  if (!BISMILLAH_BASE.test(stripped)) return text;
+  // Cut in the original at the char where the stripped prefix ends.
+  const strippedPrefixLen = stripped.split(/\s/).slice(0, 4).join(" ").length;
+  let originalIndex = 0;
+  let seen = 0;
+  while (originalIndex < text.length && seen < strippedPrefixLen) {
+    const char = text[originalIndex];
+    const isMark = char !== char.replace(TASHKEEL, "");
+    if (!isMark) seen += 1;
+    originalIndex += 1;
+  }
+  // Swallow combining marks and whitespace right after the bismillah
+  // (e.g. the kasra that belongs to the final meem of ٱلرَّحِيمِ).
+  while (
+    originalIndex < text.length &&
+    (/\s/.test(text[originalIndex]) ||
+      text[originalIndex] !== text[originalIndex].replace(TASHKEEL, ""))
+  ) {
+    originalIndex += 1;
+  }
+  return text.slice(originalIndex).trim();
+}
+
+// ---------------------------------------------------------------------------
+// Chapters
+// ---------------------------------------------------------------------------
+
+function mapChapter(raw: JsonRecord): QuranChapter {
+  return {
+    id: Number(raw.number),
+    nameArabic: String(raw.name ?? "").replace(/^سُورَةُ\s*/, ""),
+    nameEnglish: String(raw.englishName ?? ""),
+    revelationPlace:
+      String(raw.revelationType ?? "") === "Meccan" ? "makkah" : "madinah",
+    versesCount: Number(raw.numberOfAyahs ?? 0),
+  };
+}
+
+export async function fetchQuranChapters(): Promise<QuranChapter[]> {
+  const payload = await fetchJson<{ data?: unknown }>(
+    `${ALQURAN_API}/surah`,
+    "القرآن",
+  );
+  const list = Array.isArray(payload.data) ? payload.data : [];
+  return list
+    .filter(isJsonRecord)
+    .map(mapChapter)
+    .filter((chapter) => chapter.id > 0 && chapter.nameArabic)
+    .sort((a, b) => a.id - b.id);
+}
+
+/**
+ * Chapter → page ranges from quran.com (immutable data). Powers the
+ * "الأجزاء / الصفحات" pickers: a juz is pages (juz-1)*20+1 .. juz*20 (approx.),
+ * and a page maps to the surah that contains it.
+ */
+export async function fetchQuranChapterPages(): Promise<QuranChapterPage[]> {
+  const payload = await fetchJson<{ chapters?: unknown }>(
+    `${QURAN_COM_API}/chapters?language=ar`,
+    "القرآن",
+  );
+  const chapters = Array.isArray(payload.chapters) ? payload.chapters : [];
+  return chapters
+    .filter(isJsonRecord)
+    .map((raw) => {
+      const pages = Array.isArray(raw.pages) ? raw.pages : [];
+      return {
+        id: Number(raw.id),
+        nameArabic: String(raw.name_arabic ?? ""),
+        startPage: Number(pages[0] ?? 0),
+        endPage: Number(pages[1] ?? 0),
+        versesCount: Number(raw.verses_count ?? 0),
+        revelationPlace: String(raw.revelation_place ?? ""),
+      };
+    })
+    .filter((chapter) => chapter.id > 0 && chapter.startPage > 0)
+    .sort((a, b) => a.id - b.id);
+}
+
+// ---------------------------------------------------------------------------
+// Surah with verses
+// ---------------------------------------------------------------------------
+
+function mapVerse(raw: JsonRecord, index: number, surahId: number): QuranVerse {
+  const verseNumber = Number(raw.numberInSurah) || index + 1;
+  let text = String(raw.text ?? "").trim();
+  // alquran.cloud merges bismillah into ayah 1 of every surah except
+  // Al-Fatihah (1) and At-Tawbah (9) — strip it so the reader can render its
+  // own decorative bismillah banner, exactly like the server used to.
+  if (verseNumber === 1 && surahId !== 1 && surahId !== 9) {
+    text = stripLeadingBismillah(text);
+  }
+  return {
+    id: Number(raw.number) || index + 1,
+    verseNumber,
+    verseKey: `${surahId}:${verseNumber}`,
+    text,
+    juz: Number(raw.juz ?? 0),
+    page: Number(raw.page ?? 0),
+  };
+}
+
+export async function fetchQuranSurah(surahId: number): Promise<QuranSurah> {
+  if (!Number.isInteger(surahId) || surahId < 1 || surahId > 114) {
+    const error = new Error("رقم السورة غير صالح") as Error & { code?: string };
+    error.code = "SURAH_NOT_FOUND";
+    throw error;
+  }
+  const payload = await fetchJson<{ data?: unknown }>(
+    `${ALQURAN_API}/surah/${surahId}/quran-uthmani`,
+    "القرآن",
+  );
+  const data = isJsonRecord(payload.data) ? payload.data : {};
+  const ayahs = Array.isArray(data.ayahs) ? data.ayahs : [];
+  const verses = ayahs
+    .filter(isJsonRecord)
+    .map((raw, index) => mapVerse(raw, index, surahId));
+
+  // Chapter metadata comes free from the same payload — no second request.
+  const chapters = await fetchQuranChapters();
+  const chapter =
+    chapters.find((candidate) => candidate.id === surahId) ??
+    (verses.length > 0
+      ? {
+          id: surahId,
+          nameArabic: String(data.name ?? "").replace(/^سُورَةُ\s*/, ""),
+          nameEnglish: String(data.englishName ?? ""),
+          revelationPlace:
+            String(data.revelationType ?? "") === "Meccan" ? "makkah" : "madinah",
+          versesCount: verses.length,
+        }
+      : null) ??
+    (verses.length > 0
+      ? {
+          id: surahId,
+          nameArabic: `السورة ${surahId}`,
+          nameEnglish: `Surah ${surahId}`,
+          revelationPlace: "makkah",
+          versesCount: verses.length,
+        }
+      : null);
+  if (!chapter) {
+    const error = new Error("السورة غير موجودة") as Error & { code?: string };
+    error.code = "SURAH_NOT_FOUND";
+    throw error;
+  }
+  return { ...chapter, verses };
+}
+
+// ---------------------------------------------------------------------------
+// Chapter audio (reciter 7 = Mishary Alafasy)
+// ---------------------------------------------------------------------------
+
+export async function fetchQuranAudio(surahId: number): Promise<QuranAudio> {
+  const payload = await fetchJson<{ audio_file?: unknown }>(
+    `${QURAN_COM_API}/chapter_recitations/${RECITER_ID}/${surahId}`,
+    "صوت القرآن",
+  );
+  const audioFile = isJsonRecord(payload.audio_file) ? payload.audio_file : {};
+  const audioUrl = String(audioFile.audio_url ?? "");
+  if (!audioUrl) {
+    const error = new Error("تعذر تحميل الصوت") as Error & { code?: string };
+    error.code = "AUDIO_NOT_FOUND";
+    throw error;
+  }
+  return {
+    surahId,
+    audioUrl,
+    reciter: RECITER_NAME,
+    format: String(audioFile.format ?? "mp3"),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tafsir (alquran.cloud edition ar.muyassar — التفسير الميسّر)
+// ---------------------------------------------------------------------------
+
+export async function fetchQuranTafsir(
+  surahId: number,
+  ayahNumber: number,
+): Promise<QuranTafsir> {
+  const payload = await fetchJson<{ data?: unknown }>(
+    `${ALQURAN_API}/ayah/${surahId}:${ayahNumber}/ar.muyassar`,
+    "التفسير",
+  );
+  const data = isJsonRecord(payload.data) ? payload.data : {};
+  const edition = isJsonRecord(data.edition) ? data.edition : {};
+  return {
+    surahId,
+    ayahNumber,
+    // edition.name is the Arabic title ("تفسير المیسر"); englishName is the
+    // publisher ("King Fahad Quran Complex") which reads wrong in the UI.
+    resourceName: String(edition.name ?? "التفسير الميسّر"),
+    text: String(data.text ?? ""),
+  };
+}

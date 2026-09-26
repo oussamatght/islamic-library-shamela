@@ -6,9 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { QuranSurah } from './quranSurah';
-import type { QuranVerse } from './quranVerse';
 
-export interface QuranReader {
-  surah: QuranSurah;
-  verses: QuranVerse[];
+export interface ResponseEnvelopeQuranSurahList {
+  success: true;
+  data: QuranSurah[];
 }

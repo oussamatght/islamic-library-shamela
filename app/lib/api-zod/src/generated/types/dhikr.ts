@@ -7,10 +7,12 @@
  */
 
 export interface Dhikr {
-  id: number;
+  id: string;
+  categoryId: string;
   title: string;
   text: string;
   translation?: string;
+  source?: string;
   repeat: number;
   audioUrl?: string;
 }

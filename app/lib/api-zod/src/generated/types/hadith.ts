@@ -11,4 +11,7 @@ export interface Hadith {
   title: string;
   text: string;
   source: string;
+  attribution?: string;
+  grade?: string;
+  reference?: string;
 }

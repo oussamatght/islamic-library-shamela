@@ -1,6 +1,9 @@
 import React, { useEffect } from 'react';
 import { I18nManager, Platform } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -14,45 +17,46 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import Constants from 'expo-constants';
-import { setBaseUrl } from '@workspace/api-client-react';
+import { initThemePreference } from '@/hooks/useTheme';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 void SplashScreen.preventAutoHideAsync();
 
-function resolveApiBaseUrl(): string | null {
-  const configuredDomain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
-  if (configuredDomain) {
-    return /^https?:\/\//i.test(configuredDomain)
-      ? configuredDomain
-      : `https://${configuredDomain}`;
-  }
-  const host = Constants.expoConfig?.hostUri?.replace(/:\d+$/, '');
-  if (__DEV__ && host) {
-    const apiPort = process.env.EXPO_PUBLIC_API_PORT?.trim() || '3000';
-    return `http://${host}:${apiPort}`;
-  }
-  if (__DEV__) {
-    console.warn(
-      '[api-client] EXPO_PUBLIC_DOMAIN is not set and the Expo dev host could not be resolved. Set EXPO_PUBLIC_API_PORT or EXPO_PUBLIC_DOMAIN.',
-    );
-  }
-  return null;
-}
-
-setBaseUrl(resolveApiBaseUrl());
 I18nManager.allowRTL(true);
 if (Platform.OS !== 'web') {
   I18nManager.forceRTL(true);
 }
 
-const queryClient = new QueryClient();
+// Serverless data layer: providers are called directly from the device.
+// The async-storage persister keeps the whole query cache on disk — combined
+// with the Infinity staleTime on Quran text this gives real offline reading
+// of every surah the user has opened at least once.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+      staleTime: 10 * 60 * 1000,
+    },
+  },
+});
+
+const persister = createAsyncStoragePersister({
+  storage: {
+    setItem: (key, value) => AsyncStorage.setItem(key, value),
+    getItem: (key) => AsyncStorage.getItem(key),
+    removeItem: (key) => AsyncStorage.removeItem(key),
+  },
+  throttleTime: 2_000,
+});
 
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: 'رجوع', headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="quran-reader" options={{ animation: 'slide_from_left' }} />
+      <Stack.Screen name="hadith-browser" options={{ animation: 'slide_from_left' }} />
+      <Stack.Screen name="wird-settings" options={{ animation: 'slide_from_left' }} />
       <Stack.Screen name="adhkar-counter" options={{ animation: 'slide_from_left' }} />
       <Stack.Screen name="prayer" options={{ animation: 'slide_from_left' }} />
       <Stack.Screen name="qibla" options={{ animation: 'slide_from_left' }} />
@@ -71,6 +75,10 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    void initThemePreference();
+  }, []);
+
+  useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
@@ -81,13 +89,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppErrorBoundary>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 * 30 }}
+        >
           <GestureHandlerRootView>
             <KeyboardProvider>
               <RootLayoutNav />
             </KeyboardProvider>
           </GestureHandlerRootView>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </AppErrorBoundary>
     </SafeAreaProvider>
   );

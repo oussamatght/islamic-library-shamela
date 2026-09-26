@@ -1,0 +1,59 @@
+import { UpstreamError } from "./types";
+
+export type JsonRecord = Record<string, unknown>;
+
+export function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function intString(value: unknown, fallback?: number): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+export function httpsUrl(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.replace(/^http:/, "https:");
+}
+
+export function stringProp(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  return undefined;
+}
+
+/**
+ * JSON fetch with timeout + UpstreamError mapping. All providers below send
+ * `access-control-allow-origin: *`, so this works from native fetch and web.
+ */
+export async function fetchJson<T>(
+  url: string,
+  source: string,
+  options: { timeoutMs?: number } = {},
+): Promise<T> {
+  const { timeoutMs = 15_000 } = options;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    throw new UpstreamError(source);
+  }
+
+  if (!response.ok) {
+    throw new UpstreamError(
+      source,
+      response.status >= 500
+        ? `${source} غير متاح مؤقتًا، حاول لاحقًا.`
+        : `تعذر جلب البيانات من ${source}.`,
+    );
+  }
+
+  try {
+    const payload: unknown = await response.json();
+    return payload as T;
+  } catch {
+    throw new UpstreamError(source);
+  }
+}

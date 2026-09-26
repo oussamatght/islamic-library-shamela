@@ -21,6 +21,7 @@ export const HealthCheckResponse = zod.object({
  * @summary List Quran surahs
  */
 export const GetQuranSurahsResponse = zod.object({
+  "success": zod.literal(true),
   "data": zod.array(zod.object({
   "id": zod.number().int(),
   "nameArabic": zod.string(),
@@ -43,6 +44,8 @@ export const GetQuranReaderParams = zod.object({
 })
 
 export const GetQuranReaderResponse = zod.object({
+  "success": zod.literal(true),
+  "data": zod.object({
   "surah": zod.object({
   "id": zod.number().int(),
   "nameArabic": zod.string(),
@@ -59,6 +62,7 @@ export const GetQuranReaderResponse = zod.object({
   "page": zod.number().int()
 }))
 })
+})
 
 
 /**
@@ -73,10 +77,13 @@ export const GetQuranAudioParams = zod.object({
 })
 
 export const GetQuranAudioResponse = zod.object({
+  "success": zod.literal(true),
+  "data": zod.object({
   "surahId": zod.number().int(),
   "audioUrl": zod.string().url(),
   "reciter": zod.string(),
   "format": zod.string()
+})
 })
 
 
@@ -94,10 +101,13 @@ export const GetQuranTafsirParams = zod.object({
 })
 
 export const GetQuranTafsirResponse = zod.object({
+  "success": zod.literal(true),
+  "data": zod.object({
   "surahId": zod.number().int(),
   "ayahNumber": zod.number().int(),
   "resourceName": zod.string(),
   "text": zod.string()
+})
 })
 
 
@@ -120,6 +130,8 @@ export const GetPrayerTimesQueryParams = zod.object({
 })
 
 export const GetPrayerTimesResponse = zod.object({
+  "success": zod.literal(true),
+  "data": zod.object({
   "date": zod.string(),
   "hijriDate": zod.string(),
   "timezone": zod.string(),
@@ -128,6 +140,7 @@ export const GetPrayerTimesResponse = zod.object({
   "longitude": zod.number()
 }),
   "timings": zod.record(zod.string(), zod.string())
+})
 })
 
 
@@ -149,37 +162,47 @@ export const GetHadithsQueryParams = zod.object({
 })
 
 export const GetHadithsResponse = zod.object({
+  "success": zod.literal(true),
   "data": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
   "text": zod.string(),
-  "source": zod.string()
+  "source": zod.string(),
+  "attribution": zod.string().optional(),
+  "grade": zod.string().optional(),
+  "reference": zod.string().optional()
 })),
-  "page": zod.number().int(),
-  "totalPages": zod.number().int()
+  "meta": zod.object({
+  "page": zod.number().int().optional(),
+  "perPage": zod.number().int().optional(),
+  "total": zod.number().int().optional(),
+  "hasMore": zod.boolean().optional()
+})
 })
 
 
 /**
  * @summary List Arabic adhkar
  */
-export const getAdhkarQueryCategoryIdDefault = 1;
-
-
+export const getAdhkarQueryCategoryIdDefault = `hisn-27`;
 
 export const GetAdhkarQueryParams = zod.object({
-  "categoryId": zod.coerce.number().int().min(1).default(getAdhkarQueryCategoryIdDefault)
+  "categoryId": zod.coerce.string().default(getAdhkarQueryCategoryIdDefault)
 })
 
 export const GetAdhkarResponse = zod.object({
-  "categories": zod.array(zod.object({
-  "id": zod.number().int(),
+  "success": zod.literal(true),
+  "data": zod.array(zod.object({
+  "id": zod.string(),
   "title": zod.string(),
+  "count": zod.number().int().optional(),
   "items": zod.array(zod.object({
-  "id": zod.number().int(),
+  "id": zod.string(),
+  "categoryId": zod.string(),
   "title": zod.string(),
   "text": zod.string(),
   "translation": zod.string().optional(),
+  "source": zod.string().optional(),
   "repeat": zod.number().int(),
   "audioUrl": zod.string().url().optional()
 }))
@@ -190,23 +213,25 @@ export const GetAdhkarResponse = zod.object({
 /**
  * @summary List Arabic duas
  */
-export const getDuasQueryCategoryIdDefault = 6;
-
-
+export const getDuasQueryCategoryIdDefault = `hisn-104`;
 
 export const GetDuasQueryParams = zod.object({
-  "categoryId": zod.coerce.number().int().min(1).default(getDuasQueryCategoryIdDefault)
+  "categoryId": zod.coerce.string().default(getDuasQueryCategoryIdDefault)
 })
 
 export const GetDuasResponse = zod.object({
-  "categories": zod.array(zod.object({
-  "id": zod.number().int(),
+  "success": zod.literal(true),
+  "data": zod.array(zod.object({
+  "id": zod.string(),
   "title": zod.string(),
+  "count": zod.number().int().optional(),
   "items": zod.array(zod.object({
-  "id": zod.number().int(),
+  "id": zod.string(),
+  "categoryId": zod.string(),
   "title": zod.string(),
   "text": zod.string(),
   "translation": zod.string().optional(),
+  "source": zod.string().optional(),
   "repeat": zod.number().int(),
   "audioUrl": zod.string().url().optional()
 }))

@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useGetAdhkar, useGetDuas } from '@workspace/api-client-react';
+import { useGetAdhkar, useGetDuas } from '@/lib/api';
 import {
   EmptyState,
   ErrorState,
@@ -18,11 +18,12 @@ import { useColors } from '@/hooks/useColors';
 export default function AdhkarScreen() {
   const colors = useColors();
   const router = useRouter();
-  const adhkarQuery = useGetAdhkar({ categoryId: 1 });
-  const duasQuery = useGetDuas({ categoryId: 6 });
-  const categories = adhkarQuery.data?.categories ?? [];
+  const adhkarQuery = useGetAdhkar();
+  const duasQuery = useGetDuas();
+  const categories = adhkarQuery.data ?? [];
+  const duaCategory = duasQuery.data?.[0];
   const recommended = categories[0]?.items[0];
-  const dua = duasQuery.data?.categories?.[0]?.items[0];
+  const dua = duaCategory?.items[0];
 
   if (adhkarQuery.isPending || duasQuery.isPending) {
     return (
@@ -67,7 +68,7 @@ export default function AdhkarScreen() {
       </View>
       <SectionTitle title="التصنيفات" />
       <View style={styles.grid}>
-        {categories.map((category) => (
+        {categories.slice(0, 8).map((category) => (
           <Pressable
             key={`${category.id}-${category.title}`}
             testID={`adhkar-${category.id}`}
@@ -114,13 +115,13 @@ export default function AdhkarScreen() {
             ]}
           >
             <View style={[styles.counterCircle, { borderColor: colors.primary }]}>
-              <Text style={[styles.counterNumber, { color: colors.primary }]}>{recommended.repeat}</Text>
+              <Text style={[styles.counterNumber, { color: colors.primary }]}>{recommended.repeatCount}</Text>
               <Text style={[styles.counterCaption, { color: colors.mutedForeground }]}>مرة</Text>
             </View>
             <View style={styles.recommendationCopy}>
               <Text style={[styles.recommendationTitle, { color: colors.foreground }]}>{recommended.title}</Text>
               <Text numberOfLines={2} style={[styles.recommendationMeta, { color: colors.mutedForeground }]}>
-                {recommended.text}
+                {recommended.arabicText}
               </Text>
             </View>
             <Feather name="chevron-left" size={19} color={colors.mutedForeground} />
@@ -133,7 +134,7 @@ export default function AdhkarScreen() {
             <Feather name="heart" size={16} color={colors.primary} />
             <Text style={[styles.duaTitle, { color: colors.foreground }]}>دعاء من الوِرد</Text>
           </View>
-          <Text numberOfLines={4} style={[styles.duaText, { color: colors.foreground }]}>{dua.text}</Text>
+          <Text numberOfLines={4} style={[styles.duaText, { color: colors.foreground }]}>{dua.arabicText}</Text>
         </View>
       ) : null}
     </Screen>

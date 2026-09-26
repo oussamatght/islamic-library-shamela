@@ -1,15 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import {
-  getGetQuranAudioQueryKey,
-  getGetQuranReaderQueryKey,
-  getGetQuranTafsirQueryKey,
-  useGetQuranAudio,
-  useGetQuranReader,
-  useGetQuranTafsir,
-} from '@workspace/api-client-react';
+import { useGetQuranAudio, useGetQuranReader, useGetQuranTafsir } from '@/lib/api';
+import { saveReadingPosition } from '@/lib/storage';
 import {
   ErrorState,
   IconButton,
@@ -26,15 +20,28 @@ export default function QuranReader() {
   const { surah, surahId } = useLocalSearchParams<{ surah?: string; surahId?: string }>();
   const id = Number(surahId);
   const validId = Number.isInteger(id) && id >= 1 && id <= 114;
+  // "آية 1" until the user taps a verse — the tafsir card then follows the tap.
+  const [tafsirAyah, setTafsirAyah] = useState(1);
   const readerQuery = useGetQuranReader(validId ? id : 0, {
-    query: { enabled: validId, queryKey: getGetQuranReaderQueryKey(validId ? id : 0) },
+    query: { enabled: validId },
   });
   const audioQuery = useGetQuranAudio(validId ? id : 0, {
-    query: { enabled: validId, queryKey: getGetQuranAudioQueryKey(validId ? id : 0) },
+    query: { enabled: validId },
   });
-  const tafsirQuery = useGetQuranTafsir(validId ? id : 0, 1, {
-    query: { enabled: validId, queryKey: getGetQuranTafsirQueryKey(validId ? id : 0, 1) },
+  const tafsirQuery = useGetQuranTafsir(validId ? id : 0, tafsirAyah, {
+    query: { enabled: validId },
   });
+
+  // Auto-save the open position — no user action needed. Hooks must run on
+  // EVERY render (Rules of Hooks), so this lives before any early return.
+  useEffect(() => {
+    if (!validId) return;
+    void saveReadingPosition({
+      surahId: id,
+      surahName: surah,
+      ayahNumber: tafsirAyah,
+    });
+  }, [validId, id, surah, tafsirAyah]);
 
   if (!validId) {
     return (
@@ -61,7 +68,8 @@ export default function QuranReader() {
     );
   }
 
-  const { surah: surahData, verses } = readerQuery.data;
+  const surahData = readerQuery.data;
+  const verses = readerQuery.data?.verses ?? [];
   const firstVerse = verses[0];
   const audioLabel = audioQuery.isPending
     ? 'جارٍ تجهيز الصوت'
@@ -84,15 +92,16 @@ export default function QuranReader() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={audioLabel}
-          disabled={!audioQuery.data}
+          disabled={!audioQuery.data?.audioUrl}
           onPress={() => {
-            if (audioQuery.data?.audioUrl) void Linking.openURL(audioQuery.data.audioUrl);
+            const audioUrl = audioQuery.data?.audioUrl;
+            if (audioUrl) void Linking.openURL(audioUrl);
           }}
           style={({ pressed }) => [
             styles.audioButton,
             {
               backgroundColor: colors.secondary,
-              opacity: pressed || !audioQuery.data ? 0.45 : 1,
+              opacity: pressed || !audioQuery.data?.audioUrl ? 0.45 : 1,
             },
           ]}
         >
@@ -120,8 +129,12 @@ export default function QuranReader() {
             testID={`ayah-${ayah.verseNumber}`}
             accessibilityRole="button"
             accessibilityLabel={`الآية ${ayah.verseNumber}`}
+            onPress={() => setTafsirAyah(ayah.verseNumber)}
             style={({ pressed }) => [
               styles.ayah,
+              tafsirAyah === ayah.verseNumber && {
+                backgroundColor: colors.accent,
+              },
               { borderBottomColor: colors.border, opacity: pressed ? 0.72 : 1 },
             ]}
           >
@@ -135,7 +148,9 @@ export default function QuranReader() {
       <View style={[styles.tafsirCard, { backgroundColor: colors.accent }]}>
         <View style={styles.tafsirHeading}>
           <Feather name="book-open" size={16} color={colors.primary} />
-          <Text style={[styles.tafsirTitle, { color: colors.foreground }]}>التفسير</Text>
+          <Text style={[styles.tafsirTitle, { color: colors.foreground }]}>
+            تفسير الآية {tafsirAyah}
+          </Text>
         </View>
         {tafsirQuery.isPending ? <LoadingState /> : null}
         {tafsirQuery.isError ? (

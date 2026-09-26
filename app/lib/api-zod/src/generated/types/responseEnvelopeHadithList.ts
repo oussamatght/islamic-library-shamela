@@ -6,9 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Hadith } from './hadith';
+import type { PaginationMeta } from './paginationMeta';
 
-export interface HadithList {
+export interface ResponseEnvelopeHadithList {
+  success: true;
   data: Hadith[];
-  page: number;
-  totalPages: number;
+  meta: PaginationMeta;
 }

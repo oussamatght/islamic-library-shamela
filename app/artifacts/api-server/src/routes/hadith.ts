@@ -47,6 +47,8 @@ router.get("/hadiths/search", async (request, response) => {
   }
 });
 
+
+
 router.get("/hadiths/:hadithId", async (request, response) => {
   try {
     ok(response, await getHadith(String(request.params.hadithId)));
@@ -60,15 +62,16 @@ router.get("/hadiths", async (request, response) => {
     typeof request.query.categoryId === "string" && request.query.categoryId.trim()
       ? request.query.categoryId.trim()
       : "2";
-  const page = numberParam(request.query.page, 1);
-  const perPage = numberParam(request.query.perPage, 10);
+  const page = Math.max(numberParam(request.query.page, 1), 1);
+  const perPage = Math.min(Math.max(numberParam(request.query.perPage, 5), 1), 20);
   try {
     const result = await listHadiths(categoryId, page, perPage);
-    ok(
-      response,
-      result.items,
-      { page: result.page, perPage: result.perPage, total: result.total, hasMore: result.hasMore },
-    );
+    ok(response, result.items, {
+      page: result.page,
+      perPage: result.perPage,
+      total: result.total,
+      hasMore: result.hasMore,
+    });
   } catch (error) {
     handleApiError(error, response);
   }

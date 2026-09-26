@@ -43,7 +43,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuranSurahList"
+                $ref: "#/components/schemas/ResponseEnvelopeQuranSurahList"
         "502":
           $ref: "#/components/responses/UpstreamError"
   /quran/surahs/{surahId}:
@@ -59,7 +59,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuranReader"
+                $ref: "#/components/schemas/ResponseEnvelopeQuranReader"
         "502":
           $ref: "#/components/responses/UpstreamError"
   /quran/surahs/{surahId}/audio:
@@ -75,7 +75,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AudioTrack"
+                $ref: "#/components/schemas/ResponseEnvelopeAudioTrack"
         "502":
           $ref: "#/components/responses/UpstreamError"
   /quran/tafsir/{surahId}/{ayahNumber}:
@@ -97,7 +97,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Tafsir"
+                $ref: "#/components/schemas/ResponseEnvelopeTafsir"
         "502":
           $ref: "#/components/responses/UpstreamError"
   /prayer-times:
@@ -132,7 +132,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PrayerTimes"
+                $ref: "#/components/schemas/ResponseEnvelopePrayerTimes"
         "502":
           $ref: "#/components/responses/UpstreamError"
   /hadiths:
@@ -168,7 +168,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HadithList"
+                $ref: "#/components/schemas/ResponseEnvelopeHadithList"
         "502":
           $ref: "#/components/responses/UpstreamError"
   /adhkar:
@@ -184,7 +184,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DhikrCollection"
+                $ref: "#/components/schemas/ResponseEnvelopeDhikrCollection"
         "502":
           $ref: "#/components/responses/UpstreamError"
   /duas:
@@ -197,44 +197,114 @@ paths:
           in: query
           required: false
           schema:
-            type: integer
-            minimum: 1
-            default: 6
+            type: string
+            default: "hisn-104"
       responses:
         "200":
           description: Dua categories and items
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DhikrCollection"
+                $ref: "#/components/schemas/ResponseEnvelopeDhikrCollection"
         "502":
           $ref: "#/components/responses/UpstreamError"
 components:
-  parameters:
-    SurahId:
-      name: surahId
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 114
-    HusnCategoryId:
-      name: categoryId
-      in: query
-      required: false
-      schema:
-        type: integer
-        minimum: 1
-        default: 1
-  responses:
-    UpstreamError:
-      description: The live content provider could not be reached
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ApiError"
+  # ---------------------------------------------------------------------------
+  # Envelope
+  # Every content endpoint wraps its payload exactly like the server's ok():
+  #   { success: true, data: <T>, meta?: object }
+  # ---------------------------------------------------------------------------
   schemas:
+    ResponseEnvelopeQuranSurahList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuranSurah"
+      required: [success, data]
+    ResponseEnvelopeQuranReader:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          properties:
+            surah:
+              $ref: "#/components/schemas/QuranSurah"
+            verses:
+              type: array
+              items:
+                $ref: "#/components/schemas/QuranVerse"
+          required: [surah, verses]
+      required: [success, data]
+    ResponseEnvelopeAudioTrack:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/AudioTrack"
+      required: [success, data]
+    ResponseEnvelopeTafsir:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/Tafsir"
+      required: [success, data]
+    ResponseEnvelopePrayerTimes:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/PrayerTimes"
+      required: [success, data]
+    ResponseEnvelopeHadithList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hadith"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [success, data, meta]
+    ResponseEnvelopeDhikrCollection:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DhikrCategory"
+      required: [success, data]
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        perPage:
+          type: integer
+        total:
+          type: integer
+        hasMore:
+          type: boolean
     HealthStatus:
       type: object
       properties:
@@ -265,14 +335,6 @@ components:
         versesCount:
           type: integer
       required: [id, nameArabic, nameEnglish, revelationPlace, versesCount]
-    QuranSurahList:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/QuranSurah"
-      required: [data]
     QuranVerse:
       type: object
       properties:
@@ -289,16 +351,6 @@ components:
         page:
           type: integer
       required: [id, verseNumber, verseKey, text, juz, page]
-    QuranReader:
-      type: object
-      properties:
-        surah:
-          $ref: "#/components/schemas/QuranSurah"
-        verses:
-          type: array
-          items:
-            $ref: "#/components/schemas/QuranVerse"
-      required: [surah, verses]
     AudioTrack:
       type: object
       properties:
@@ -357,54 +409,70 @@ components:
           type: string
         source:
           type: string
+        attribution:
+          type: string
+        grade:
+          type: string
+        reference:
+          type: string
       required: [id, title, text, source]
-    HadithList:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/Hadith"
-        page:
-          type: integer
-        totalPages:
-          type: integer
-      required: [data, page, totalPages]
     Dhikr:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+        categoryId:
+          type: string
         title:
           type: string
         text:
           type: string
         translation:
           type: string
+        source:
+          type: string
         repeat:
           type: integer
         audioUrl:
           type: string
           format: uri
-      required: [id, title, text, repeat]
+      required: [id, categoryId, title, text, repeat]
     DhikrCategory:
       type: object
       properties:
         id:
-          type: integer
+          type: string
         title:
           type: string
+        count:
+          type: integer
         items:
           type: array
           items:
             $ref: "#/components/schemas/Dhikr"
       required: [id, title, items]
-    DhikrCollection:
-      type: object
-      properties:
-        categories:
-          type: array
-          items:
-            $ref: "#/components/schemas/DhikrCategory"
-      required: [categories]
 
+
+  parameters:
+    SurahId:
+      name: surahId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 114
+    HusnCategoryId:
+      name: categoryId
+      in: query
+      required: false
+      schema:
+        type: string
+        default: "hisn-27"
+  responses:
+    UpstreamError:
+      description: The live content provider could not be reached
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"

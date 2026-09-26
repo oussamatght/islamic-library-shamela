@@ -2,26 +2,76 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useGetQuranSurahs } from '@workspace/api-client-react';
+import { useGetQuranChapterPages, useGetQuranSurahs } from '@/lib/api';
 import { AppHeader, ErrorState, isOfflineError, LoadingState, SearchBar, Screen } from '@/components/ui';
 import { radii, spacing, typography } from '@/constants/tokens';
 import { useColors } from '@/hooks/useColors';
+
+type TabKey = 'surahs' | 'juz' | 'pages';
+
+const JUZ_PAGE_COUNT = 20; // ~20 mushaf pages per juz (604 pages / 30 juz)
 
 export default function QuranScreen() {
   const colors = useColors();
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<TabKey>('surahs');
+
   const surahsQuery = useGetQuranSurahs();
-  const surahs = surahsQuery.data?.data ?? [];
+  const chapterPagesQuery = useGetQuranChapterPages();
+  const surahs = surahsQuery.data ?? [];
+  const chapterPages = chapterPagesQuery.data ?? [];
+
   const filtered = useMemo(
     () =>
-      surahs.filter((surah) =>
-        `${surah.nameArabic} ${surah.nameEnglish}`.toLowerCase().includes(query.toLowerCase()),
+      surahs.filter((item) =>
+        `${item.nameArabic} ${item.nameEnglish}`.toLowerCase().includes(query.toLowerCase()),
       ),
     [query, surahs],
   );
 
-  if (surahsQuery.isPending) {
+  // A juz entry = the range of surahs whose page ranges overlap it.
+  const juzList = useMemo(() => {
+    const list: Array<{ juz: number; label: string; firstSurahId: number; firstSurahName: string }> = [];
+    for (let juz = 1; juz <= 30; juz += 1) {
+      const startPage = (juz - 1) * JUZ_PAGE_COUNT + 1;
+      const endPage = Math.min(juz * JUZ_PAGE_COUNT, 604);
+      const covering = chapterPages.filter(
+        (chapter) => chapter.startPage <= endPage && chapter.endPage >= startPage,
+      );
+      const first = covering[0];
+      if (first) {
+        list.push({
+          juz,
+          label: `الجزء ${juz}`,
+          firstSurahId: first.id,
+          firstSurahName: first.nameArabic,
+        });
+      }
+    }
+    return list;
+  }, [chapterPages]);
+
+  // A page entry = the surah whose page range contains it.
+  const pageList = useMemo(() => {
+    const list: Array<{ page: number; surahId: number; surahName: string }> = [];
+    for (const chapter of chapterPages) {
+      for (let page = chapter.startPage; page <= chapter.endPage; page += 1) {
+        if (page > 604) break;
+        list.push({ page, surahId: chapter.id, surahName: chapter.nameArabic });
+      }
+    }
+    return list;
+  }, [chapterPages]);
+
+  const isLoading = surahsQuery.isPending || chapterPagesQuery.isPending;
+  const isError = surahsQuery.isError || chapterPagesQuery.isError;
+  const retry = () => {
+    void surahsQuery.refetch();
+    void chapterPagesQuery.refetch();
+  };
+
+  if (isLoading) {
     return (
       <Screen>
         <AppHeader eyebrow="وردك اليومي" title="القرآن الكريم" />
@@ -30,26 +80,27 @@ export default function QuranScreen() {
     );
   }
 
-  if (surahsQuery.isError) {
+  if (isError) {
     return (
       <Screen>
         <AppHeader eyebrow="وردك اليومي" title="القرآن الكريم" />
-        <ErrorState offline={isOfflineError(surahsQuery.error)} onRetry={() => void surahsQuery.refetch()} />
+        <ErrorState offline={isOfflineError(surahsQuery.error ?? chapterPagesQuery.error)} onRetry={retry} />
       </Screen>
     );
   }
 
-  if (surahs.length === 0) {
-    return (
-      <Screen>
-        <AppHeader eyebrow="وردك اليومي" title="القرآن الكريم" />
-        <View style={styles.empty}>
-          <Feather name="book-open" size={22} color={colors.mutedForeground} />
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>لا توجد سور متاحة الآن</Text>
-        </View>
-      </Screen>
-    );
-  }
+  const openSurah = (surahId: number, nameArabic?: string) => {
+    router.push({
+      pathname: '/quran-reader',
+      params: { surahId: String(surahId), ...(nameArabic ? { surah: nameArabic } : {}) },
+    });
+  };
+
+  const tabs: Array<{ key: TabKey; label: string }> = [
+    { key: 'surahs', label: 'السور' },
+    { key: 'juz', label: 'الأجزاء' },
+    { key: 'pages', label: 'الصفحات' },
+  ];
 
   return (
     <Screen scroll={false}>
@@ -62,65 +113,136 @@ export default function QuranScreen() {
       />
       <SearchBar placeholder="ابحث في القرآن..." value={query} onChangeText={setQuery} />
       <View style={styles.tabs}>
-        {['السور', 'الأجزاء', 'الصفحات'].map((tab, index) => (
+        {tabs.map(({ key, label }) => (
           <Pressable
-            key={tab}
+            key={key}
             accessibilityRole="tab"
-            accessibilityState={{ selected: index === 0 }}
-            style={[styles.tab, index === 0 && { backgroundColor: colors.primary }]}
+            accessibilityState={{ selected: tab === key }}
+            onPress={() => setTab(key)}
+            style={[styles.tab, tab === key && { backgroundColor: colors.primary }]}
           >
-            <Text style={[styles.tabText, { color: index === 0 ? colors.primaryForeground : colors.mutedForeground }]}>
-              {tab}
+            <Text
+              style={[
+                styles.tabText,
+                { color: tab === key ? colors.primaryForeground : colors.mutedForeground },
+              ]}
+            >
+              {label}
             </Text>
           </Pressable>
         ))}
       </View>
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.id)}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <Text style={[styles.listCount, { color: colors.mutedForeground }]}>{surahs.length} سورة</Text>
-            <Text style={[styles.listHint, { color: colors.mutedForeground }]}>بسم الله الرحمن الرحيم</Text>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="search" size={22} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>لا توجد نتائج</Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            testID={`surah-${item.id}`}
-            accessibilityRole="button"
-            accessibilityLabel={`فتح سورة ${item.nameArabic}`}
-            onPress={() =>
-              router.push({
-                pathname: '/quran-reader',
-                params: { surahId: String(item.id), surah: item.nameArabic },
-              })
-            }
-            style={({ pressed }) => [
-              styles.surahRow,
-              { borderBottomColor: colors.border, opacity: pressed ? 0.65 : 1 },
-            ]}
-          >
-            <View style={[styles.number, { backgroundColor: colors.secondary }]}>
-              <Text style={[styles.numberText, { color: colors.primary }]}>{String(item.id).padStart(2, '0')}</Text>
+
+      {tab === 'surahs' ? (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => `surah-${item.id}`}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <Text style={[styles.listCount, { color: colors.mutedForeground }]}>{surahs.length} سورة</Text>
+              <Text style={[styles.listHint, { color: colors.mutedForeground }]}>بسم الله الرحمن الرحيم</Text>
             </View>
-            <View style={styles.surahCopy}>
-              <Text style={[styles.surahName, { color: colors.foreground }]}>{item.nameArabic}</Text>
-              <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>
-                {item.revelationPlace} • {item.versesCount} آية
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Feather name="search" size={22} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>لا توجد نتائج</Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              testID={`surah-${item.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`فتح سورة ${item.nameArabic}`}
+              onPress={() => openSurah(item.id, item.nameArabic)}
+              style={({ pressed }) => [
+                styles.surahRow,
+                { borderBottomColor: colors.border, opacity: pressed ? 0.65 : 1 },
+              ]}
+            >
+              <View style={[styles.number, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.numberText, { color: colors.primary }]}>{String(item.id).padStart(2, '0')}</Text>
+              </View>
+              <View style={styles.surahCopy}>
+                <Text style={[styles.surahName, { color: colors.foreground }]}>{item.nameArabic}</Text>
+                <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>
+                  {item.revelationPlace === 'makkah' ? 'مكية' : 'مدنية'} • {item.versesCount} آية
+                </Text>
+              </View>
+              <Feather name="chevron-left" size={18} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        />
+      ) : null}
+
+      {tab === 'juz' ? (
+        <FlatList
+          data={juzList}
+          keyExtractor={(item) => `juz-${item.juz}`}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>لا توجد أجزاء متاحة الآن</Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              testID={`juz-${item.juz}`}
+              accessibilityRole="button"
+              accessibilityLabel={`فتح ${item.label}`}
+              onPress={() => openSurah(item.firstSurahId, item.firstSurahName)}
+              style={({ pressed }) => [
+                styles.surahRow,
+                { borderBottomColor: colors.border, opacity: pressed ? 0.65 : 1 },
+              ]}
+            >
+              <View style={[styles.number, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.numberText, { color: colors.primary }]}>{String(item.juz).padStart(2, '0')}</Text>
+              </View>
+              <View style={styles.surahCopy}>
+                <Text style={[styles.surahName, { color: colors.foreground }]}>{item.label}</Text>
+                <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>يبدأ من سورة {item.firstSurahName}</Text>
+              </View>
+              <Feather name="chevron-left" size={18} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        />
+      ) : null}
+
+      {tab === 'pages' ? (
+        <FlatList
+          data={pageList}
+          keyExtractor={(item) => `page-${item.page}`}
+          showsVerticalScrollIndicator={false}
+          numColumns={4}
+          contentContainerStyle={styles.gridList}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>لا توجد صفحات متاحة الآن</Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              testID={`page-${item.page}`}
+              accessibilityRole="button"
+              accessibilityLabel={`فتح الصفحة ${item.page}`}
+              onPress={() => openSurah(item.surahId, item.surahName)}
+              style={({ pressed }) => [
+                styles.pageCell,
+                { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.65 : 1 },
+              ]}
+            >
+              <Text style={[styles.pageNumber, { color: colors.primary }]}>{item.page}</Text>
+              <Text numberOfLines={1} style={[styles.pageSurah, { color: colors.mutedForeground }]}>
+                {item.surahName}
               </Text>
-            </View>
-            <Feather name="chevron-left" size={18} color={colors.mutedForeground} />
-          </Pressable>
-        )}
-      />
+            </Pressable>
+          )}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -130,6 +252,7 @@ const styles = StyleSheet.create({
   tab: { borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: 8 },
   tabText: { fontSize: typography.bodySmall, fontWeight: '700' },
   list: { paddingBottom: 110 },
+  gridList: { paddingBottom: 110, paddingTop: spacing.md },
   listHeader: { alignItems: 'center', flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: spacing.lg },
   listCount: { fontSize: typography.caption },
   listHint: { fontSize: typography.bodySmall, textAlign: 'right' },
@@ -139,6 +262,9 @@ const styles = StyleSheet.create({
   surahCopy: { alignItems: 'flex-end', flex: 1 },
   surahName: { fontSize: typography.bodyLarge, fontWeight: '700' },
   surahMeta: { fontSize: typography.caption, marginTop: 4 },
+  pageCell: { alignItems: 'center', borderRadius: radii.sm, borderWidth: 1, flexGrow: 1, margin: 4, paddingVertical: 12 },
+  pageNumber: { fontSize: typography.body, fontWeight: '700' },
+  pageSurah: { fontSize: typography.caption, marginTop: 2 },
   empty: { alignItems: 'center', gap: spacing.sm, padding: spacing.xxl },
   emptyText: { fontSize: typography.bodySmall, textAlign: 'center' },
 });

@@ -8,7 +8,8 @@
 import type { Dhikr } from './dhikr';
 
 export interface DhikrCategory {
-  id: number;
+  id: string;
   title: string;
+  count?: number;
   items: Dhikr[];
 }

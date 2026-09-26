@@ -5,15 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export interface ApiError {
-  message: string;
-  source?: string;
-}
-
 export interface QuranSurah {
   id: number;
   nameArabic: string;
@@ -22,7 +13,8 @@ export interface QuranSurah {
   versesCount: number;
 }
 
-export interface QuranSurahList {
+export interface ResponseEnvelopeQuranSurahList {
+  success: true;
   data: QuranSurah[];
 }
 
@@ -35,9 +27,14 @@ export interface QuranVerse {
   page: number;
 }
 
-export interface QuranReader {
+export type ResponseEnvelopeQuranReaderData = {
   surah: QuranSurah;
   verses: QuranVerse[];
+};
+
+export interface ResponseEnvelopeQuranReader {
+  success: true;
+  data: ResponseEnvelopeQuranReaderData;
 }
 
 export interface AudioTrack {
@@ -47,11 +44,21 @@ export interface AudioTrack {
   format: string;
 }
 
+export interface ResponseEnvelopeAudioTrack {
+  success: true;
+  data: AudioTrack;
+}
+
 export interface Tafsir {
   surahId: number;
   ayahNumber: number;
   resourceName: string;
   text: string;
+}
+
+export interface ResponseEnvelopeTafsir {
+  success: true;
+  data: Tafsir;
 }
 
 export type PrayerTimesLocation = {
@@ -69,36 +76,64 @@ export interface PrayerTimes {
   timings: PrayerTimesTimings;
 }
 
+export interface ResponseEnvelopePrayerTimes {
+  success: true;
+  data: PrayerTimes;
+}
+
 export interface Hadith {
   id: string;
   title: string;
   text: string;
   source: string;
+  attribution?: string;
+  grade?: string;
+  reference?: string;
 }
 
-export interface HadithList {
+export interface PaginationMeta {
+  page?: number;
+  perPage?: number;
+  total?: number;
+  hasMore?: boolean;
+}
+
+export interface ResponseEnvelopeHadithList {
+  success: true;
   data: Hadith[];
-  page: number;
-  totalPages: number;
+  meta: PaginationMeta;
 }
 
 export interface Dhikr {
-  id: number;
+  id: string;
+  categoryId: string;
   title: string;
   text: string;
   translation?: string;
+  source?: string;
   repeat: number;
   audioUrl?: string;
 }
 
 export interface DhikrCategory {
-  id: number;
+  id: string;
   title: string;
+  count?: number;
   items: Dhikr[];
 }
 
-export interface DhikrCollection {
-  categories: DhikrCategory[];
+export interface ResponseEnvelopeDhikrCollection {
+  success: true;
+  data: DhikrCategory[];
+}
+
+export interface HealthStatus {
+  status: string;
+}
+
+export interface ApiError {
+  message: string;
+  source?: string;
 }
 
 /**
@@ -106,7 +141,7 @@ export interface DhikrCollection {
  */
 export type UpstreamErrorResponse = ApiError;
 
-export type HusnCategoryIdParameter = number;
+export type HusnCategoryIdParameter = string;
 
 export type GetPrayerTimesParams = {
 /**
@@ -139,16 +174,10 @@ perPage?: number;
 };
 
 export type GetAdhkarParams = {
-/**
- * @minimum 1
- */
 categoryId?: HusnCategoryIdParameter;
 };
 
 export type GetDuasParams = {
-/**
- * @minimum 1
- */
-categoryId?: number;
+categoryId?: string;
 };
 

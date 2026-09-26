@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
-import { getGetPrayerTimesQueryKey, useGetPrayerTimes } from '@workspace/api-client-react';
+import { useGetPrayerTimes } from '@/lib/api';
 import { ErrorState, IconButton, isOfflineError, LoadingState, Screen } from '@/components/ui';
 import { radii, spacing, typography } from '@/constants/tokens';
 import { useColors } from '@/hooks/useColors';
@@ -71,12 +71,11 @@ export default function PrayerScreen() {
     [coordinates],
   );
   const prayerQuery = useGetPrayerTimes(prayerParams, {
-    query: { enabled: Boolean(coordinates), queryKey: getGetPrayerTimesQueryKey(prayerParams) },
+    query: { enabled: Boolean(coordinates) },
   });
 
   const nextPrayer = useMemo(() => {
-    if (!prayerQuery.data) return null;
-    const timings = prayerQuery.data.timings ?? {};
+    const timings = prayerQuery.data?.timings ?? {};
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const upcoming = prayerRows
