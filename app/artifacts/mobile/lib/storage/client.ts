@@ -39,4 +39,5 @@ export const storageKeys = {
   favorites: "favorites.v1",
   readingPosition: "reading.position.v1",
   settings: "settings.v1",
+  tasbih: "tasbih.history.v1",
 } as const;

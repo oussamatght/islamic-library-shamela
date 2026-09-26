@@ -10,7 +10,6 @@
  *     remains to be added).
  *   - audio                            : 12h (URLs can rotate)
  *   - hadith lists                     : 1h  — categories 24h
- *   - adhkar                           : 24h
  *   - prayer times                     : 1h
  */
 
@@ -19,6 +18,7 @@ import {
   fetchQuranAudio,
   fetchQuranChapterPages,
   fetchQuranChapters,
+  fetchQuranJuz,
   fetchQuranSurah,
   fetchQuranTafsir,
 } from "./quran";
@@ -28,16 +28,23 @@ import {
   fetchHadithCategories,
   fetchHadithList,
 } from "./hadith";
-import { fetchAdhkarCollection } from "./adhkar";
 import { fetchPrayerTimes } from "./prayer";
+import {
+  getLocalChapters,
+  getLocalJuz,
+  getLocalSurah,
+  getLocalTafsir,
+  isQuranDownloaded,
+  storeLocalTafsir,
+} from "../offline/quranDb";
 import type {
-  AdhkarItem,
   HadithBook,
   HadithCategoryNode,
   HadithPage,
   QuranAudio,
   QuranChapter,
   QuranChapterPage,
+  QuranJuz,
   QuranSurah,
   QuranTafsir,
   PrayerTimesResult,
@@ -51,7 +58,6 @@ const ETERNITY = Infinity;
 
 export type PrayTimesParams = { latitude: number; longitude: number; date?: string };
 export type HadithsParams = { categoryId?: string; page?: number; perPage?: number };
-export type AdhkarParams = { categoryId?: string };
 
 // ---------------------------------------------------------------------------
 // Quran — stable query keys exported so the search helper (below) and future
@@ -64,12 +70,21 @@ export const quranKeys = {
   audio: (id: number) => ["quran", "audio", id] as const,
   tafsir: (surahId: number, ayah: number) =>
     ["quran", "tafsir", surahId, ayah] as const,
+  juz: (juz: number) => ["quran", "juz", juz] as const,
 };
 
 export function useGetQuranSurahs(): UseQueryResult<QuranChapter[], Error> {
   return useQuery({
     queryKey: quranKeys.surahs,
-    queryFn: fetchQuranChapters,
+    // Offline-first: the local SQLite copy wins once the full download exists;
+    // otherwise we fetch and let the persister cache the list as before.
+    queryFn: async () => {
+      if (isQuranDownloaded()) {
+        const local = getLocalChapters();
+        if (local) return local;
+      }
+      return fetchQuranChapters();
+    },
     staleTime: ETERNITY,
     gcTime: ETERNITY,
   });
@@ -83,7 +98,13 @@ export function useGetQuranReader(
     options?.query?.enabled ?? (surahId >= 1 && surahId <= 114);
   return useQuery({
     queryKey: quranKeys.surah(surahId),
-    queryFn: () => fetchQuranSurah(surahId),
+    queryFn: async () => {
+      if (isQuranDownloaded()) {
+        const local = getLocalSurah(surahId);
+        if (local) return local;
+      }
+      return fetchQuranSurah(surahId);
+    },
     enabled,
     staleTime: ETERNITY,
     gcTime: ETERNITY,
@@ -114,7 +135,36 @@ export function useGetQuranTafsir(
     options?.query?.enabled ?? (surahId >= 1 && surahId <= 114);
   return useQuery({
     queryKey: quranKeys.tafsir(surahId, ayahNumber),
-    queryFn: () => fetchQuranTafsir(surahId, ayahNumber),
+    // Cache-aside: every fetched tafsir is stored locally, so after viewing
+    // once it reads offline. Failure never blocks reading (sheet shows retry).
+    queryFn: async () => {
+      const local = getLocalTafsir(surahId, ayahNumber);
+      if (local) return local;
+      const remote = await fetchQuranTafsir(surahId, ayahNumber);
+      storeLocalTafsir(remote);
+      return remote;
+    },
+    enabled,
+    staleTime: ETERNITY,
+    gcTime: ETERNITY,
+  });
+}
+
+/** Whole-juz content with REAL boundaries (alquran.cloud /juz/{n}). */
+export function useGetQuranJuz(
+  juz: number,
+  options?: { query?: { enabled?: boolean } },
+): UseQueryResult<QuranJuz, Error> {
+  const enabled = options?.query?.enabled ?? (juz >= 1 && juz <= 30);
+  return useQuery({
+    queryKey: quranKeys.juz(juz),
+    queryFn: async () => {
+      if (isQuranDownloaded()) {
+        const local = getLocalJuz(juz);
+        if (local) return local;
+      }
+      return fetchQuranJuz(juz);
+    },
     enabled,
     staleTime: ETERNITY,
     gcTime: ETERNITY,
@@ -201,52 +251,20 @@ export function useGetQuranChapterPages(): UseQueryResult<QuranChapterPage[], Er
 
 export function useGetHadiths(
   params?: HadithsParams,
+  options?: { query?: { enabled?: boolean } },
 ): UseQueryResult<HadithPage, Error> {
   const categoryId = params?.categoryId ?? "2";
   const page = params?.page ?? 1;
   const perPage = params?.perPage ?? 5;
+  const enabled = options?.query?.enabled ?? true;
   return useQuery({
     queryKey: ["hadith", "list", categoryId, page, perPage],
     queryFn: () => fetchHadithList(categoryId, page, perPage),
+    enabled,
     staleTime: HOUR,
     gcTime: DAY,
   });
 }
-
-// ---------------------------------------------------------------------------
-// Adhkar / duas
-// ---------------------------------------------------------------------------
-
-export function useGetAdhkar(
-  params?: AdhkarParams,
-): UseQueryResult<AdhkarCollection, Error> {
-  const categoryId = params?.categoryId;
-  return useQuery({
-    queryKey: ["adhkar", categoryId ?? "default"],
-    queryFn: () => fetchAdhkarCollection(categoryId),
-    staleTime: DAY,
-    gcTime: 2 * DAY,
-  });
-}
-
-export function useGetDuas(
-  params?: AdhkarParams,
-): UseQueryResult<AdhkarCollection, Error> {
-  const categoryId = params?.categoryId ?? "hisn-107";
-  return useQuery({
-    queryKey: ["duas", categoryId],
-    queryFn: () => fetchAdhkarCollection(categoryId),
-    staleTime: DAY,
-    gcTime: 2 * DAY,
-  });
-}
-
-export type AdhkarCollection = Array<{
-  id: string;
-  title: string;
-  count: number;
-  items: AdhkarItem[];
-}>;
 
 // ---------------------------------------------------------------------------
 // Client-side Quran search (Phase B groundwork) — searches over verses already

@@ -9,7 +9,43 @@ import { useColors } from '@/hooks/useColors';
 
 type TabKey = 'surahs' | 'juz' | 'pages';
 
-const JUZ_PAGE_COUNT = 20; // ~20 mushaf pages per juz (604 pages / 30 juz)
+/**
+ * Real juz starting points (mushaf-order), shown as the subtitle of each juz
+ * row. The juz CONTENT itself comes from the API (fetchQuranJuz) — these are
+ * only display labels, not approximated ranges.
+ */
+const JUZ_STARTS: Array<{ juz: number; label: string }> = [
+  { juz: 1, label: 'الفاتحة ١ – البقرة ١٤١' },
+  { juz: 2, label: 'البقرة ١٤٢ – ٢٥٢' },
+  { juz: 3, label: 'البقرة ٢٥٣ – آل عمران ٩٢' },
+  { juz: 4, label: 'آل عمران ٩٣ – النساء ٢٣' },
+  { juz: 5, label: 'النساء ٢٤ – ١٤٧' },
+  { juz: 6, label: 'النساء ١٤٨ – المائدة ٨١' },
+  { juz: 7, label: 'المائدة ٨٢ – الأنعام ١١٠' },
+  { juz: 8, label: 'الأنعام ١١١ – الأعراف ٨٧' },
+  { juz: 9, label: 'الأعراف ٨٨ – الأنفال ٤٠' },
+  { juz: 10, label: 'الأنفال ٤١ – التوبة ٩٢' },
+  { juz: 11, label: 'التوبة ٩٣ – هود ٨٣' },
+  { juz: 12, label: 'هود ٨٤ – يوسف ٥٢' },
+  { juz: 13, label: 'يوسف ٥٣ – إبراهيم ٥٢' },
+  { juz: 14, label: 'الحجر – النحل ١٢٨' },
+  { juz: 15, label: 'الإسراء – الكهف ٧٤' },
+  { juz: 16, label: 'الكهف ٧٥ – طه ١٣٥' },
+  { juz: 17, label: 'الأنبياء – الحج ٧٨' },
+  { juz: 18, label: 'الحج ٧٩ – المؤمنون ١١٨' },
+  { juz: 19, label: 'الفرقان – النمل ٥٥' },
+  { juz: 20, label: 'النمل ٥٦ – العنكبوت ٤٥' },
+  { juz: 21, label: 'العنكبوت ٤٦ – الأحزاب ٣٠' },
+  { juz: 22, label: 'الأحزاب ٣١ – يس ٢٧' },
+  { juz: 23, label: 'يس ٢٨ – الزمر ٣١' },
+  { juz: 24, label: 'الزمر ٣٢ – فصلت ٤٦' },
+  { juz: 25, label: 'فصلت ٤٧ – الجاثية ٣٧' },
+  { juz: 26, label: 'الأحقاف – الذاريات ٣٠' },
+  { juz: 27, label: 'الذاريات ٣١ – الحديد ٢٩' },
+  { juz: 28, label: 'المجادلة – التحريم ١٢' },
+  { juz: 29, label: 'المزمل – المرسلات ٥٠' },
+  { juz: 30, label: 'النبإ – الناس' },
+];
 
 export default function QuranScreen() {
   const colors = useColors();
@@ -30,27 +66,9 @@ export default function QuranScreen() {
     [query, surahs],
   );
 
-  // A juz entry = the range of surahs whose page ranges overlap it.
-  const juzList = useMemo(() => {
-    const list: Array<{ juz: number; label: string; firstSurahId: number; firstSurahName: string }> = [];
-    for (let juz = 1; juz <= 30; juz += 1) {
-      const startPage = (juz - 1) * JUZ_PAGE_COUNT + 1;
-      const endPage = Math.min(juz * JUZ_PAGE_COUNT, 604);
-      const covering = chapterPages.filter(
-        (chapter) => chapter.startPage <= endPage && chapter.endPage >= startPage,
-      );
-      const first = covering[0];
-      if (first) {
-        list.push({
-          juz,
-          label: `الجزء ${juz}`,
-          firstSurahId: first.id,
-          firstSurahName: first.nameArabic,
-        });
-      }
-    }
-    return list;
-  }, [chapterPages]);
+  // Juz entries are real starting points (labels only) — the actual verses
+  // and surah ranges are fetched per juz from the API when opened.
+  const juzList = JUZ_STARTS.map(({ juz, label }) => ({ juz, label }));
 
   // A page entry = the surah whose page range contains it.
   const pageList = useMemo(() => {
@@ -107,9 +125,9 @@ export default function QuranScreen() {
       <AppHeader
         eyebrow="وردك اليومي"
         title="القرآن الكريم"
-        action="settings"
-        actionLabel="إعدادات القراءة"
-        onAction={() => router.push('/settings')}
+        action="download"
+        actionLabel="تنزيل القرآن للقراءة بدون إنترنت"
+        onAction={() => router.push('/quran-download')}
       />
       <SearchBar placeholder="ابحث في القرآن..." value={query} onChangeText={setQuery} />
       <View style={styles.tabs}>
@@ -192,8 +210,8 @@ export default function QuranScreen() {
             <Pressable
               testID={`juz-${item.juz}`}
               accessibilityRole="button"
-              accessibilityLabel={`فتح ${item.label}`}
-              onPress={() => openSurah(item.firstSurahId, item.firstSurahName)}
+              accessibilityLabel={`فتح الجزء ${item.juz}`}
+              onPress={() => router.push(`/juz-reader?juz=${item.juz}`)}
               style={({ pressed }) => [
                 styles.surahRow,
                 { borderBottomColor: colors.border, opacity: pressed ? 0.65 : 1 },
@@ -203,8 +221,8 @@ export default function QuranScreen() {
                 <Text style={[styles.numberText, { color: colors.primary }]}>{String(item.juz).padStart(2, '0')}</Text>
               </View>
               <View style={styles.surahCopy}>
-                <Text style={[styles.surahName, { color: colors.foreground }]}>{item.label}</Text>
-                <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>يبدأ من سورة {item.firstSurahName}</Text>
+                <Text style={[styles.surahName, { color: colors.foreground }]}>الجزء {item.juz}</Text>
+                <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>{item.label}</Text>
               </View>
               <Feather name="chevron-left" size={18} color={colors.mutedForeground} />
             </Pressable>

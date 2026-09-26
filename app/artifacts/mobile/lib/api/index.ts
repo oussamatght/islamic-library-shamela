@@ -1,6 +1,12 @@
 export * from "./types";
 export * from "./queries";
-export { fetchQuranChapters, fetchQuranSurah, fetchQuranAudio, fetchQuranTafsir } from "./quran";
+export {
+  fetchQuranChapters,
+  fetchQuranSurah,
+  fetchQuranAudio,
+  fetchQuranTafsir,
+  fetchQuranJuz,
+} from "./quran";
 export {
   fetchHadithCategories,
   fetchHadithCategoryChildren,
@@ -8,12 +14,6 @@ export {
   fetchHadithDetail,
   searchHadiths,
 } from "./hadith";
-export {
-  listAdhkarCategories,
-  fetchAdhkarCategoryItems,
-  fetchAdhkarCollection,
-  fetchAdhkarItem,
-} from "./adhkar";
 export { fetchPrayerTimes } from "./prayer";
 export {
   fetchHadithBooks,

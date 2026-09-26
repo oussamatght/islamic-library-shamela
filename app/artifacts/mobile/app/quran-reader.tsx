@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useGetQuranAudio, useGetQuranReader, useGetQuranTafsir } from '@/lib/api';
@@ -22,6 +22,8 @@ export default function QuranReader() {
   const validId = Number.isInteger(id) && id >= 1 && id <= 114;
   // "آية 1" until the user taps a verse — the tafsir card then follows the tap.
   const [tafsirAyah, setTafsirAyah] = useState(1);
+  // Bottom-sheet visibility; tafsirAyah holds which verse the sheet shows.
+  const [tafsirOpen, setTafsirOpen] = useState(false);
   const readerQuery = useGetQuranReader(validId ? id : 0, {
     query: { enabled: validId },
   });
@@ -129,7 +131,10 @@ export default function QuranReader() {
             testID={`ayah-${ayah.verseNumber}`}
             accessibilityRole="button"
             accessibilityLabel={`الآية ${ayah.verseNumber}`}
-            onPress={() => setTafsirAyah(ayah.verseNumber)}
+            onPress={() => {
+              setTafsirAyah(ayah.verseNumber);
+              setTafsirOpen(true);
+            }}
             style={({ pressed }) => [
               styles.ayah,
               tafsirAyah === ayah.verseNumber && {
@@ -145,27 +150,64 @@ export default function QuranReader() {
           </Pressable>
         ))
       )}
-      <View style={[styles.tafsirCard, { backgroundColor: colors.accent }]}>
-        <View style={styles.tafsirHeading}>
-          <Feather name="book-open" size={16} color={colors.primary} />
-          <Text style={[styles.tafsirTitle, { color: colors.foreground }]}>
-            تفسير الآية {tafsirAyah}
-          </Text>
-        </View>
-        {tafsirQuery.isPending ? <LoadingState /> : null}
-        {tafsirQuery.isError ? (
-          <Text style={[styles.statusText, { color: colors.mutedForeground }]}>تعذر تحميل التفسير الآن.</Text>
-        ) : (
-          <Text style={[styles.tafsirText, { color: colors.foreground }]}>
-            {tafsirQuery.data?.text?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ||
-              'لا يوجد تفسير متاح لهذه الآية.'}
-          </Text>
-        )}
-      </View>
+      {/* Tafsir bottom sheet — opening/refreshing it never blocks reading:
+          the reader stays fully usable when the tafsir API fails. */}
+      <Modal
+        visible={tafsirOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTafsirOpen(false)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setTafsirOpen(false)}>
+          <Pressable
+            style={[styles.sheet, { backgroundColor: colors.background }]}
+            onPress={() => undefined}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
+                  تفسير الآية {tafsirAyah}
+                </Text>
+                <Text style={[styles.sheetSource, { color: colors.primary }]}>
+                  {surahData.nameArabic} • {tafsirQuery.data?.resourceName ?? 'التفسير الميسّر'}
+                </Text>
+              </View>
+              <IconButton
+                icon="x"
+                label="إغلاق التفسير"
+                onPress={() => setTafsirOpen(false)}
+                variant="soft"
+              />
+            </View>
+            {verses.find((verse) => verse.verseNumber === tafsirAyah) ? (
+              <View style={[styles.sheetVerse, { backgroundColor: colors.accent }]}> 
+                <Text style={[styles.sheetVerseText, { color: colors.foreground }]}>
+                  {verses.find((verse) => verse.verseNumber === tafsirAyah)?.text}
+                </Text>
+              </View>
+            ) : null}
+            <View style={styles.sheetBody}>
+              {tafsirQuery.isPending ? <LoadingState /> : null}
+              {tafsirQuery.isError ? (
+                <ErrorState
+                  offline={isOfflineError(tafsirQuery.error)}
+                  onRetry={() => void tafsirQuery.refetch()}
+                />
+              ) : (
+                <Text style={[styles.sheetTafsirText, { color: colors.foreground }]}>
+                  {tafsirQuery.data?.text?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ||
+                    'لا يوجد تفسير متاح لهذه الآية.'}
+                </Text>
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <View style={[styles.readerNote, { backgroundColor: colors.accent }]}>
         <Feather name="bookmark" size={16} color={colors.primary} />
         <Text style={[styles.readerNoteText, { color: colors.foreground }]}>
-          اضغط على أي آية لحفظ موضع القراءة في جهازك
+          اضغط على أي آية لعرض التفسير وحفظ موضع القراءة
         </Text>
       </View>
     </Screen>
@@ -187,9 +229,23 @@ const styles = StyleSheet.create({
   ayahNumberText: { fontSize: typography.caption, fontWeight: '700' },
   ayahText: { flex: 1, fontSize: typography.quranLarge, lineHeight: 50, textAlign: 'right' },
   tafsirCard: { borderRadius: radii.sm, marginTop: spacing.lg, padding: spacing.md },
-  tafsirHeading: { alignItems: 'center', flexDirection: 'row-reverse', gap: spacing.xs },
-  tafsirTitle: { fontSize: typography.body, fontWeight: '700' },
-  tafsirText: { fontSize: typography.bodySmall, lineHeight: 24, marginTop: spacing.sm, textAlign: 'right' },
+  sheetBackdrop: { backgroundColor: 'rgba(0,0,0,0.45)', flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    maxHeight: '82%',
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  sheetHandle: { alignSelf: 'center', borderRadius: radii.pill, height: 4, marginBottom: spacing.md, width: 44 },
+  sheetHeader: { alignItems: 'center', flexDirection: 'row-reverse', justifyContent: 'space-between' },
+  sheetTitle: { fontSize: typography.h3, fontWeight: '700', textAlign: 'right' },
+  sheetSource: { fontSize: typography.caption, marginTop: 2, textAlign: 'right' },
+  sheetVerse: { borderRadius: radii.sm, marginTop: spacing.md, padding: spacing.md },
+  sheetVerseText: { fontSize: typography.quranMedium, lineHeight: 38, textAlign: 'right' },
+  sheetBody: { marginTop: spacing.md },
+  sheetTafsirText: { fontSize: typography.body, lineHeight: 28, textAlign: 'right' },
   readerNote: { alignItems: 'center', borderRadius: radii.sm, flexDirection: 'row-reverse', gap: spacing.sm, marginTop: spacing.lg, padding: spacing.md },
   readerNoteText: { flex: 1, fontSize: typography.bodySmall, lineHeight: 21, textAlign: 'right' },
 });

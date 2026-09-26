@@ -10,7 +10,6 @@ import {
   fetchQuranTafsir,
 } from "../lib/api/quran";
 import { fetchHadithList, fetchHadithCategories } from "../lib/api/hadith";
-import { fetchAdhkarCollection, listAdhkarCategories } from "../lib/api/adhkar";
 import { fetchPrayerTimes } from "../lib/api/prayer";
 import { computeNextPrayer, searchQuranVerses } from "../lib/api/queries";
 import {
@@ -53,11 +52,6 @@ async function main() {
   console.log("— Hadith categories:");
   const cats = await fetchHadithCategories();
   console.log("  roots:", cats.length);
-
-  console.log("— Adhkar (hisn-28):");
-  const adhkar = await fetchAdhkarCollection("hisn-28");
-  console.log("  cat:", adhkar[0].title, "| items:", adhkar[0].items.length, "| repeat:", adhkar[0].items[0].repeatCount);
-  console.log("  manifest size:", listAdhkarCategories().length, "categories");
 
   console.log("— Prayer times (Rabat):");
   const prayer = await fetchPrayerTimes(34.02, -6.83);

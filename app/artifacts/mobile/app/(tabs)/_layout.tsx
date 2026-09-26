@@ -27,9 +27,9 @@ function NativeTabLayout() {
         />
         <NativeTabs.Trigger.Label>القرآن</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="adhkar">
-        <NativeTabs.Trigger.Icon sf={{ default: 'sparkles', selected: 'sparkles' }} />
-        <NativeTabs.Trigger.Label>الأذكار</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="tasbih">
+        <NativeTabs.Trigger.Icon sf={{ default: 'circle.circle', selected: 'circle.circle.fill' }} />
+        <NativeTabs.Trigger.Label>التسبيح</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
         <NativeTabs.Trigger.Icon sf={{ default: 'ellipsis', selected: 'ellipsis.circle.fill' }} />
@@ -102,14 +102,14 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="adhkar"
+        name="tasbih"
         options={{
-          title: 'الأذكار',
+          title: 'التسبيح',
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="sparkles" tintColor={color} size={22} />
+              <SymbolView name="circle.circle" tintColor={color} size={22} />
             ) : (
-              <Feather name="sun" size={21} color={color} />
+              <Feather name="target" size={21} color={color} />
             ),
         }}
       />

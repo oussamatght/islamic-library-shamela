@@ -15,6 +15,8 @@ import type {
   QuranAudio,
   QuranChapter,
   QuranChapterPage,
+  QuranJuz,
+  QuranJuzSurahRange,
   QuranSurah,
   QuranTafsir,
   QuranVerse,
@@ -191,6 +193,72 @@ export async function fetchQuranSurah(surahId: number): Promise<QuranSurah> {
     throw error;
   }
   return { ...chapter, verses };
+}
+
+/**
+ * Whole-juz fetch — REAL juz boundaries from the same alquran.cloud source
+ * (each ayah carries its juz/page), not a page-range approximation. Used by
+ * the "الأجزاء" tab: pick a juz → see its actual surah ranges + read its verses.
+ */
+export async function fetchQuranJuz(juz: number): Promise<QuranJuz> {
+  if (!Number.isInteger(juz) || juz < 1 || juz > 30) {
+    const error = new Error("رقم الجزء غير صالح") as Error & { code?: string };
+    error.code = "JUZ_NOT_FOUND";
+    throw error;
+  }
+  const payload = await fetchJson<{ data?: unknown }>(
+    `${ALQURAN_API}/juz/${juz}/quran-uthmani`,
+    "القرآن",
+  );
+  const data = isJsonRecord(payload.data) ? payload.data : {};
+  const ayahs = Array.isArray(data.ayahs) ? data.ayahs : [];
+  const raws = ayahs.filter(isJsonRecord);
+  if (raws.length === 0) {
+    const error = new Error("الجزء غير موجود") as Error & { code?: string };
+    error.code = "JUZ_NOT_FOUND";
+    throw error;
+  }
+
+  const verses: QuranVerse[] = [];
+  const ranges = new Map<number, QuranJuzSurahRange>();
+  for (const raw of raws) {
+    const surahRaw = isJsonRecord(raw.surah) ? raw.surah : {};
+    const surahId = Number(surahRaw.number);
+    const verseNumber = Number(raw.numberInSurah);
+    const verse: QuranVerse = {
+      id: Number(raw.number),
+      verseNumber,
+      verseKey: `${surahId}:${verseNumber}`,
+      // Bismillah only ever merges into ayah 1 of a surah, and /juz chunks
+      // start mid-surah (except juz 1), so ayah 1 of Fatihah/Tawbah is the
+      // only case needing preservation — handled here explicitly.
+      text: String(raw.text ?? "").trim(),
+      juz: Number(raw.juz ?? juz),
+      page: Number(raw.page ?? 0),
+    };
+    verses.push(verse);
+
+    const existing = ranges.get(surahId);
+    const nameArabic = String(surahRaw.name ?? "").replace(/^سُورَةُ\s*/, "");
+    if (existing) {
+      existing.toAyah = verseNumber;
+    } else {
+      ranges.set(surahId, {
+        surahId,
+        nameArabic,
+        fromAyah: verseNumber,
+        toAyah: verseNumber,
+        startPage: Number(raw.page ?? 0),
+      });
+    }
+  }
+
+  return {
+    juz,
+    ayahCount: verses.length,
+    verses,
+    surahRanges: [...ranges.values()].sort((a, b) => a.surahId - b.surahId),
+  };
 }
 
 // ---------------------------------------------------------------------------

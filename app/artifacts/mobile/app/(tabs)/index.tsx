@@ -37,9 +37,9 @@ export default function HomeScreen() {
         contentContainerStyle={styles.quickActions}
       >
         <QuickAction icon="compass" label="القبلة" onPress={() => router.push('/qibla')} />
-        <QuickAction icon="heart" label="الدعاء" onPress={() => router.push('/adhkar-counter')} />
+        <QuickAction icon="heart" label="المفضلة" onPress={() => router.push('/favorites')} />
         <QuickAction icon="message-circle" label="الأحاديث" onPress={() => router.push('/(tabs)/more')} />
-        <QuickAction icon="sun" label="الأذكار" onPress={() => router.push('/(tabs)/adhkar')} />
+        <QuickAction icon="target" label="التسبيح" onPress={() => router.push('/(tabs)/tasbih')} />
         <QuickAction icon="book-open" label="القرآن" onPress={() => router.push('/(tabs)/quran')} />
       </ScrollView>
 

@@ -47,6 +47,12 @@ export default function QiblaScreen() {
   const [sensorError, setSensorError] = useState(false);
 
   const spin = useRef(new Animated.Value(0)).current;
+  // Wrap-aware smoothing state (kept in refs — no re-render per sample):
+  //   headingRef = low-pass-filtered device heading (0..360)
+  //   dialRef    = cumulative dial angle so rotations always take the
+  //                shortest path and never jump when crossing north (359↔1).
+  const headingRef = useRef(0);
+  const dialRef = useRef(0);
 
   // 1) Get the device position once.
   useEffect(() => {
@@ -59,9 +65,15 @@ export default function QiblaScreen() {
         return;
       }
       try {
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        // Guard against GPS hangs: treat >12s as a location error.
+        const position = await Promise.race([
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('location-timeout')), 12_000),
+          ),
+        ]);
         if (active) {
           setCoordinates({
             latitude: position.coords.latitude,
@@ -95,7 +107,14 @@ export default function QiblaScreen() {
                 ? headingInfo.trueHeading
                 : headingInfo.magHeading
               : headingInfo.magHeading ?? 0;
-          setHeading(value);
+          // Low-pass filter with wrap-around (0°/360°) awareness: move the
+          // smoothed heading 35% toward each raw sample along the SHORT arc,
+          // so the dial neither flickers nor sweeps the long way round.
+          const previous = headingRef.current;
+          const delta = ((value - previous + 540) % 360) - 180;
+          const smoothed = (previous + delta * 0.35 + 360) % 360;
+          headingRef.current = smoothed;
+          setHeading(smoothed);
         });
         if (active) {
           subscription = { remove: () => void watcher.remove() };
@@ -118,12 +137,17 @@ export default function QiblaScreen() {
     [coordinates],
   );
 
-  // Rotate the dial so the Kaaba marker sits at (qiblaBearing − heading).
+  // Rotate the dial so the Kaaba marker sits at (qiblaBearing − heading),
+  // advancing the CUMULATIVE angle by the shortest signed difference — the
+  // 0°/360° wrap never produces a full backwards sweep.
   useEffect(() => {
-    const target = heading !== null ? qiblaBearing - heading : qiblaBearing;
+    const absolute = heading !== null ? qiblaBearing - heading : qiblaBearing;
+    const delta = ((absolute - dialRef.current + 540) % 360) - 180;
+    const next = dialRef.current + delta;
+    dialRef.current = next;
     Animated.timing(spin, {
-      toValue: target,
-      duration: 300,
+      toValue: next,
+      duration: 220,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
@@ -157,13 +181,13 @@ export default function QiblaScreen() {
   }
 
   const rotate = spin.interpolate({
-    inputRange: [-360, 0, 360],
-    outputRange: ['-360deg', '0deg', '360deg'],
+    inputRange: [-3600, 0, 3600],
+    outputRange: ['-3600deg', '0deg', '3600deg'],
   });
-  const aligned =
-    heading !== null
-      ? Math.abs(((qiblaBearing - heading + 540) % 360) - 180) >= 175
-      : false;
+  // Signed shortest difference to the qibla (−180..180) — what the user reads.
+  const relative =
+    heading !== null ? ((qiblaBearing - heading + 540) % 360) - 180 : null;
+  const aligned = relative !== null ? Math.abs(relative) <= 5 : false;
 
   return (
     <Screen scroll={false} contentStyle={styles.container}>
@@ -198,10 +222,10 @@ export default function QiblaScreen() {
         </View>
 
         <Text style={[styles.heading, { color: colors.foreground }]}>
-          {heading !== null
+          {relative !== null
             ? aligned
               ? 'أنت باتجاه القبلة ✓'
-              : `${Math.round(qiblaBearing - heading)}° عن القبلة`
+              : `${Math.round(Math.abs(relative))}° عن القبلة ${relative > 0 ? 'يمينًا' : 'يسارًا'}`
             : 'اتجاه القبلة'}
         </Text>
         <Text style={[styles.helper, { color: colors.mutedForeground }]}>

@@ -37,6 +37,23 @@ export type QuranSurah = QuranChapter & {
   verses: QuranVerse[];
 };
 
+/** A surah's extent inside one juz — computed from real ayah data. */
+export type QuranJuzSurahRange = {
+  surahId: number;
+  nameArabic: string;
+  fromAyah: number;
+  toAyah: number;
+  startPage: number;
+};
+
+export type QuranJuz = {
+  juz: number;
+  ayahCount: number;
+  /** Continuous verses of the whole juz, in mushaf order. */
+  verses: QuranVerse[];
+  surahRanges: QuranJuzSurahRange[];
+};
+
 export type QuranAudio = {
   surahId: number;
   audioUrl: string;
@@ -83,26 +100,6 @@ export type HadithBook = {
   nameAr: string;
   nameEn: string;
   total: number;
-};
-
-export type AdhkarCategory = {
-  id: string;
-  nameAr: string;
-  count: number;
-  order: number;
-};
-
-export type AdhkarItem = {
-  id: string;
-  categoryId: string;
-  title: string;
-  arabicText: string;
-  translation?: string;
-  source: string;
-  reference?: string;
-  repeatCount: number;
-  order: number;
-  audioUrl?: string;
 };
 
 export type PrayerTimesResult = {
